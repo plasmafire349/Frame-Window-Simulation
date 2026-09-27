@@ -20,8 +20,6 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 
     void update(float dt) {
-        // If simulating, we take control of update stepping.
-        // Actually, we can just let it run standard update, but we tell the simulator to process the tick.
         PlayLayer::update(dt);
         FWCSimulator::get().processTick(this);
     }
@@ -46,24 +44,27 @@ class $modify(MyPauseLayer, PauseLayer) {
     }
 
     void onStartSim(CCObject*) {
-        utils::file::pickFile(
-            utils::file::PickMode::OpenFile,
-            {"*.json"},
-            [this](std::filesystem::path path) {
-                ReplayData data = parseReplayFile(path);
-                if (data.actions.empty()) {
-                    FLAlertLayer::create("Error", "Failed to parse replay or no actions found.", "OK")->show();
-                    return;
-                }
-                
-                FWCSimulator::get().startSimulation(data);
-                
-                // Resume game
-                this->onResume(nullptr);
-            },
-            []() {
-                // cancelled
+        file::FilePickOptions::Filter filter;
+        filter.description = "JSON Replay Files";
+        filter.files = {"*.json"};
+
+        file::FilePickOptions options;
+        options.filters.push_back(filter);
+
+        file::pick(file::PickMode::OpenFile, options).listen([this](file::PickResult const* result) {
+            if (!result || !result->isOk()) return;
+            auto optPath = result->unwrap();
+            if (!optPath.has_value()) return;
+
+            auto path = optPath.value();
+            ReplayData data = parseReplayFile(path);
+            if (data.actions.empty()) {
+                FLAlertLayer::create("Error", "Failed to parse replay or no actions found.", "OK")->show();
+                return;
             }
-        );
+
+            FWCSimulator::get().startSimulation(data);
+            this->onResume(nullptr);
+        });
     }
 };

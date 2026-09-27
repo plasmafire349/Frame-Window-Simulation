@@ -14,32 +14,35 @@ ReplayData parseReplayFile(const std::filesystem::path& path) {
 
     std::string content = result.unwrap();
 
-    // Try parsing as JSON
-    try {
-        auto json = matjson::parse(content);
-        if (json.contains("fps")) {
-            data.fps = json["fps"].as_double();
+    // Try parsing as JSON using matjson modern API
+    auto parseRes = matjson::parse(content);
+    if (!parseRes) {
+        log::error("Failed to parse JSON replay: {}", parseRes.unwrapErr());
+        return data;
+    }
+
+    matjson::Value json = parseRes.unwrap();
+
+    if (json.contains("fps") && json["fps"].is_number()) {
+        data.fps = static_cast<float>(json["fps"].as_double().unwrapOr(240.0));
+    }
+
+    if (json.contains("actions") && json["actions"].is_array()) {
+        for (auto const& actionObj : json["actions"].as_array().unwrap()) {
+            ReplayAction action;
+            action.frame = actionObj["frame"].as_int().unwrapOr(0);
+            action.hold = actionObj["hold"].as_bool().unwrapOr(false);
+            action.button = actionObj.contains("button") ? actionObj["button"].as_int().unwrapOr(1) : 1;
+            data.actions.push_back(action);
         }
-        if (json.contains("actions")) {
-            for (auto& actionObj : json["actions"]) {
-                ReplayAction action;
-                action.frame = actionObj["frame"].as_int();
-                action.hold = actionObj["hold"].as_bool();
-                action.button = actionObj.contains("button") ? actionObj["button"].as_int() : 1;
-                data.actions.push_back(action);
-            }
-        } else if (json.isArray()) {
-            // simple array
-            for (auto& actionObj : json) {
-                ReplayAction action;
-                action.frame = actionObj["frame"].as_int();
-                action.hold = actionObj["down"].as_bool();
-                action.button = 1;
-                data.actions.push_back(action);
-            }
+    } else if (json.is_array()) {
+        for (auto const& actionObj : json.as_array().unwrap()) {
+            ReplayAction action;
+            action.frame = actionObj["frame"].as_int().unwrapOr(0);
+            action.hold = actionObj["down"].as_bool().unwrapOr(false);
+            action.button = 1;
+            data.actions.push_back(action);
         }
-    } catch(const std::exception& e) {
-        log::error("Failed to parse JSON replay: {}", e.what());
     }
 
     return data;
