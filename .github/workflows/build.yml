@@ -24,8 +24,6 @@ jobs:
       - name: Build Mod
         uses: geode-sdk/build-geode-mod@main
         with:
-          bindings: geode-sdk/bindings
-          bindings-ref: main
-          sdk: geode-sdk/geode
+          sdk: v3.3.1
           combine: true
           build-config: Release
