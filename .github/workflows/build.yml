@@ -24,7 +24,6 @@ jobs:
       - name: Build Mod
         uses: geode-sdk/build-geode-mod@main
         with:
-          sdk: v3.3.1
+          sdk: v5.7.1
           combine: true
           build-config: Release
-          configure-args: -DCMAKE_POLICY_VERSION_MINIMUM=3.5
