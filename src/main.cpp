@@ -3,6 +3,7 @@
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <Geode/utils/file.hpp>
+#include <Geode/ui/BasedButtonSprite.hpp>
 #include "FWCSimulator.hpp"
 
 using namespace geode::prelude;
@@ -36,8 +37,15 @@ class $modify(MyPauseLayer, PauseLayer) {
         auto menu = this->getChildByID("right-button-menu");
         if (!menu) return;
 
-        auto spr = ButtonSprite::create("FWC Sim");
+        // Use a small circular button sprite to fit natively in right-button-menu
+        // (same size as the % and gear buttons already there)
+        auto spr = CircleButtonSprite::createWithSpriteFrameName(
+            "GJ_replayBtn_001.png",
+            CircleBaseColor::Green,
+            CircleBaseSize::Small
+        );
         auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(MyPauseLayer::onStartSim));
+        btn->setID("fwc-sim-button"_spr);
         menu->addChild(btn);
         menu->updateLayout();
     }
@@ -45,8 +53,8 @@ class $modify(MyPauseLayer, PauseLayer) {
     void onStartSim(CCObject*) {
         async::spawn(file::pick(file::PickMode::OpenFile, file::FilePickOptions {
             .filters = { file::FilePickOptions::Filter {
-                .description = "JSON Replay Files",
-                .files = { "*.json" },
+                .description = "Replay Files (*.gdr2, *.gdr, *.json)",
+                .files = { "*.gdr2", "*.gdr", "*.json" },
             }}
         }), [this](Result<std::optional<std::filesystem::path>> result) {
             if (result.isOk() && result.unwrap().has_value()) {
