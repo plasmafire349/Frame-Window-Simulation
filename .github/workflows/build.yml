@@ -26,7 +26,6 @@ jobs:
         with:
           bindings: geode-sdk/bindings
           bindings-ref: main
-          geode: geode-sdk/geode
-          geode-ref: main
+          sdk: geode-sdk/geode
           combine: true
           build-config: Release
