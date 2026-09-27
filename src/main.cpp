@@ -13,7 +13,6 @@ class $modify(MyPlayLayer, PlayLayer) {
             return false;
         }
 
-        // ensure simulator is idle on start
         FWCSimulator::get().stopSimulation();
 
         return true;
@@ -44,27 +43,23 @@ class $modify(MyPauseLayer, PauseLayer) {
     }
 
     void onStartSim(CCObject*) {
-        file::FilePickOptions::Filter filter;
-        filter.description = "JSON Replay Files";
-        filter.files = {"*.json"};
+        async::spawn(file::pick(file::PickMode::OpenFile, file::FilePickOptions {
+            .filters = { file::FilePickOptions::Filter {
+                .description = "JSON Replay Files",
+                .files = { "*.json" },
+            }}
+        }), [this](Result<std::optional<std::filesystem::path>> result) {
+            if (result.isOk() && result.unwrap().has_value()) {
+                auto path = result.unwrap().value();
+                ReplayData data = parseReplayFile(path);
+                if (data.actions.empty()) {
+                    FLAlertLayer::create("Error", "Failed to parse replay or no actions found.", "OK")->show();
+                    return;
+                }
 
-        file::FilePickOptions options;
-        options.filters.push_back(filter);
-
-        file::pick(file::PickMode::OpenFile, options).listen([this](file::PickResult const* result) {
-            if (!result || !result->isOk()) return;
-            auto optPath = result->unwrap();
-            if (!optPath.has_value()) return;
-
-            auto path = optPath.value();
-            ReplayData data = parseReplayFile(path);
-            if (data.actions.empty()) {
-                FLAlertLayer::create("Error", "Failed to parse replay or no actions found.", "OK")->show();
-                return;
+                FWCSimulator::get().startSimulation(data);
+                this->onResume(nullptr);
             }
-
-            FWCSimulator::get().startSimulation(data);
-            this->onResume(nullptr);
         });
     }
 };
