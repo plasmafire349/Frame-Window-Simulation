@@ -27,3 +27,4 @@ jobs:
           sdk: v3.3.1
           combine: true
           build-config: Release
+          configure-args: -DCMAKE_POLICY_VERSION_MINIMUM=3.5
