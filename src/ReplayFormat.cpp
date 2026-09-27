@@ -26,21 +26,29 @@ ReplayData parseReplayFile(const std::filesystem::path& path) {
         data.fps = static_cast<float>(json["fps"].as<double>().unwrapOr(240.0));
     }
 
+    std::vector<matjson::Value> emptyArr;
+
     if (json.contains("actions") && json["actions"].isArray()) {
-        for (auto const& actionObj : json["actions"].as<std::vector<matjson::Value>>().unwrapOr({})) {
-            ReplayAction action;
-            action.frame = actionObj["frame"].as<int>().unwrapOr(0);
-            action.hold = actionObj["hold"].as<bool>().unwrapOr(false);
-            action.button = actionObj.contains("button") ? actionObj["button"].as<int>().unwrapOr(1) : 1;
-            data.actions.push_back(action);
+        auto actionsRes = json["actions"].as<std::vector<matjson::Value>>();
+        if (actionsRes.isOk()) {
+            for (auto const& actionObj : actionsRes.unwrap()) {
+                ReplayAction action;
+                action.frame = actionObj["frame"].as<int>().unwrapOr(0);
+                action.hold = actionObj["hold"].as<bool>().unwrapOr(false);
+                action.button = actionObj.contains("button") ? actionObj["button"].as<int>().unwrapOr(1) : 1;
+                data.actions.push_back(action);
+            }
         }
     } else if (json.isArray()) {
-        for (auto const& actionObj : json.as<std::vector<matjson::Value>>().unwrapOr({})) {
-            ReplayAction action;
-            action.frame = actionObj["frame"].as<int>().unwrapOr(0);
-            action.hold = actionObj["down"].as<bool>().unwrapOr(false);
-            action.button = 1;
-            data.actions.push_back(action);
+        auto actionsRes = json.as<std::vector<matjson::Value>>();
+        if (actionsRes.isOk()) {
+            for (auto const& actionObj : actionsRes.unwrap()) {
+                ReplayAction action;
+                action.frame = actionObj["frame"].as<int>().unwrapOr(0);
+                action.hold = actionObj["down"].as<bool>().unwrapOr(false);
+                action.button = 1;
+                data.actions.push_back(action);
+            }
         }
     }
 
