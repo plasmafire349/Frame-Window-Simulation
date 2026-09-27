@@ -39,8 +39,9 @@ class $modify(MyPauseLayer, PauseLayer) {
 
         // Use a small circular button sprite to fit natively in right-button-menu
         // (same size as the % and gear buttons already there)
+        auto icon = CCSprite::createWithSpriteFrameName("GJ_replayBtn_001.png");
         auto spr = CircleButtonSprite::create(
-            "GJ_replayBtn_001.png",
+            icon,
             CircleBaseColor::Green,
             CircleBaseSize::Small
         );
