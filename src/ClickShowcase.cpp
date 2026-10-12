@@ -115,9 +115,23 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
     }
 
     m_fps = res.fps;
+    m_duration = res.duration;
 
     int totalFrames = res.actions.back().frame;
     if (totalFrames <= 0) totalFrames = 1;
+
+    // Calculate percent by level time
+    float totalDuration = m_duration;
+    if (totalDuration <= 0.0f) {
+        if (auto pl = PlayLayer::get()) {
+            totalDuration = pl->timeForXPos(pl->m_levelLength);
+        }
+    }
+    if (totalDuration <= 0.0f) {
+        totalDuration = static_cast<float>(totalFrames) / m_fps;
+    }
+    if (totalDuration <= 0.0f) totalDuration = 1.0f;
+    m_duration = totalDuration;
 
     int index = 1;
     for (size_t i = 0; i < res.actions.size(); i++) {
@@ -127,7 +141,9 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
         info.clickIndex = index++;
         info.isHold = act.hold;
         info.isPlayer2 = act.isPlayer2;
-        info.percent = std::clamp((static_cast<float>(act.frame) / static_cast<float>(totalFrames)) * 100.0f, 0.0f, 100.0f);
+
+        float timeSeconds = static_cast<float>(act.frame) / m_fps;
+        info.percent = std::clamp((timeSeconds / totalDuration) * 100.0f, 0.0f, 100.0f);
         info.position = ccp(act.frame * 1.29825f, 105.0f);
 
         // Every click or release defaults to None
@@ -138,7 +154,7 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
 
     applyAssignments();
 
-    log::info("Loaded {} actions from replay dynamically", m_clicks.size());
+    log::info("Loaded {} actions from replay dynamically (Duration: {:.2f}s, FPS: {:.1f})", m_clicks.size(), m_duration, m_fps);
 }
 
 cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
@@ -175,22 +191,6 @@ cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
     }
 
     markerNode->addChild(circle, 0);
-
-    // Label
-    std::string text = info.isHold
-        ? fmt::format("{} #{} ({:.1f}%)", static_cast<char>(info.tier), info.clickIndex, info.percent)
-        : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(info.tier), info.clickIndex, info.percent);
-    auto label = CCLabelBMFont::create(text.c_str(), "bigFont.fnt");
-    label->setAnchorPoint({ 1.0f, 0.5f });
-    label->setPosition({ -18.0f, 0.0f });
-    label->setScale(0.5f);
-    label->setColor({
-        static_cast<GLubyte>(color.r * 255),
-        static_cast<GLubyte>(color.g * 255),
-        static_cast<GLubyte>(color.b * 255)
-    });
-    label->setOpacity(static_cast<GLubyte>(color.a * 255));
-    markerNode->addChild(label, 1);
 
     return markerNode;
 }

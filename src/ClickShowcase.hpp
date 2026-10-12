@@ -16,9 +16,11 @@ public:
     bool m_showMarkers = true;
     bool m_playAudio = true;
     bool m_showHUD = true;
+    bool m_botOnly = true;
 
     std::vector<ClickMarkerInfo> m_clicks;
     float m_fps = 240.0f;
+    float m_duration = 0.0f;
     int m_currentFrame = 0;
     int m_lastTriggeredFrame = -1;
 

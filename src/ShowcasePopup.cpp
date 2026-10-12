@@ -164,7 +164,7 @@ bool ShowcasePopup::init() {
     auto importBtn = CCMenuItemSpriteExtra::create(
         importSpr, this, menu_selector(ShowcasePopup::onImport)
     );
-    importBtn->setPosition({ -120.f, -114.f });
+    importBtn->setPosition({ -145.f, -114.f });
     bottomMenu->addChild(importBtn);
 
     // Export button
@@ -172,34 +172,47 @@ bool ShowcasePopup::init() {
     auto exportBtn = CCMenuItemSpriteExtra::create(
         exportSpr, this, menu_selector(ShowcasePopup::onExport)
     );
-    exportBtn->setPosition({ -45.f, -114.f });
+    exportBtn->setPosition({ -75.f, -114.f });
     bottomMenu->addChild(exportBtn);
 
     // Markers toggler
     auto togglerMarkers = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleMarkers), 0.60f
+        this, menu_selector(ShowcasePopup::onToggleMarkers), 0.55f
     );
     togglerMarkers->toggle(ClickShowcase::get().m_showMarkers);
-    togglerMarkers->setPosition({ 45.f, -108.f });
+    togglerMarkers->setPosition({ -5.f, -108.f });
     bottomMenu->addChild(togglerMarkers);
 
     auto lblMarkers = CCLabelBMFont::create("Markers", "goldFont.fnt");
-    lblMarkers->setScale(0.35f);
-    lblMarkers->setPosition({ winSize.width / 2.f + 45.f, winSize.height / 2.f - 126.f });
+    lblMarkers->setScale(0.32f);
+    lblMarkers->setPosition({ winSize.width / 2.f - 5.f, winSize.height / 2.f - 126.f });
     m_mainLayer->addChild(lblMarkers);
 
     // Sounds toggler
     auto togglerAudio = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleAudio), 0.60f
+        this, menu_selector(ShowcasePopup::onToggleAudio), 0.55f
     );
     togglerAudio->toggle(ClickShowcase::get().m_playAudio);
-    togglerAudio->setPosition({ 125.f, -108.f });
+    togglerAudio->setPosition({ 65.f, -108.f });
     bottomMenu->addChild(togglerAudio);
 
     auto lblAudio = CCLabelBMFont::create("Sounds", "goldFont.fnt");
-    lblAudio->setScale(0.35f);
-    lblAudio->setPosition({ winSize.width / 2.f + 125.f, winSize.height / 2.f - 126.f });
+    lblAudio->setScale(0.32f);
+    lblAudio->setPosition({ winSize.width / 2.f + 65.f, winSize.height / 2.f - 126.f });
     m_mainLayer->addChild(lblAudio);
+
+    // Bot Only toggler
+    auto togglerBot = CCMenuItemToggler::createWithStandardSprites(
+        this, menu_selector(ShowcasePopup::onToggleBotOnly), 0.55f
+    );
+    togglerBot->toggle(ClickShowcase::get().m_botOnly);
+    togglerBot->setPosition({ 135.f, -108.f });
+    bottomMenu->addChild(togglerBot);
+
+    auto lblBot = CCLabelBMFont::create("Bot Only", "goldFont.fnt");
+    lblBot->setScale(0.32f);
+    lblBot->setPosition({ winSize.width / 2.f + 135.f, winSize.height / 2.f - 126.f });
+    m_mainLayer->addChild(lblBot);
 
     this->setKeypadEnabled(true);
     this->setTouchEnabled(true);
@@ -458,10 +471,7 @@ void ShowcasePopup::onRowTierClicked(CCObject* sender) {
                 }
 
                 if (c.tier != ClickTier::None) {
-                    std::string markerText = c.isHold
-                        ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(c.tier), c.clickIndex, c.percent)
-                        : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(c.tier), c.clickIndex, c.percent);
-                    spawnMarkerInPlayLayer(c.position, markerText, getTierColor(c.tier), c.clickIndex);
+                    spawnMarkerInPlayLayer(c.position, getTierColor(c.tier), c.clickIndex, !c.isHold);
                 } else {
                     removeMarkerInPlayLayer(c.clickIndex);
                 }
@@ -498,8 +508,12 @@ void ShowcasePopup::onQuickAssignCurrent(CCObject* sender) {
     ClickTier targetTier = static_cast<ClickTier>(btn->getTag());
     CCPoint playerPos = pl->m_player1->getPosition();
     int currFrame = getCurrentPhysicsFrame();
-    float currPercent = (pl->m_levelLength > 0.f)
-        ? std::clamp((playerPos.x / pl->m_levelLength) * 100.0f, 0.0f, 100.0f)
+    float totalDur = ClickShowcase::get().m_duration;
+    if (totalDur <= 0.0f && pl->m_levelLength > 0.f) {
+        totalDur = pl->timeForXPos(pl->m_levelLength);
+    }
+    float currPercent = (totalDur > 0.0f)
+        ? std::clamp(((static_cast<float>(currFrame) / ClickShowcase::get().m_fps) / totalDur) * 100.0f, 0.0f, 100.0f)
         : pl->getCurrentPercent();
 
     auto& clicks = ClickShowcase::get().m_clicks;
@@ -545,8 +559,7 @@ void ShowcasePopup::onQuickAssignCurrent(CCObject* sender) {
 
     int cIdx = match ? match->clickIndex : static_cast<int>(clicks.size());
     if (targetTier != ClickTier::None) {
-        std::string markerText = fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(targetTier), cIdx, currPercent);
-        spawnMarkerInPlayLayer(playerPos, markerText, getTierColor(targetTier), cIdx);
+        spawnMarkerInPlayLayer(playerPos, getTierColor(targetTier), cIdx, match ? !match->isHold : false);
     } else {
         removeMarkerInPlayLayer(cIdx);
     }
@@ -592,6 +605,11 @@ void ShowcasePopup::onToggleMarkers(CCObject*) {
 
 void ShowcasePopup::onToggleAudio(CCObject*) {
     ClickShowcase::get().m_playAudio = !ClickShowcase::get().m_playAudio;
+}
+
+void ShowcasePopup::onToggleBotOnly(CCObject*) {
+    ClickShowcase::get().m_botOnly = !ClickShowcase::get().m_botOnly;
+    triggerPlayLayerHUDUpdate();
 }
 
 void ShowcasePopup::onImport(CCObject*) {

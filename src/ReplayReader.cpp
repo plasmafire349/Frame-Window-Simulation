@@ -58,7 +58,7 @@ static ReplayFileResult parseGDR2(const uint8_t* buf, size_t len) {
     readString(buf, pos, len); // inputTag
     readString(buf, pos, len); // author
     readString(buf, pos, len); // description
-    readFloatBE(buf, pos);     // duration
+    res.duration = readFloatBE(buf, pos); // duration
 
     readVarint(buf, pos, len); // gameVersion
     double framerate = readDoubleBE(buf, pos);
@@ -161,6 +161,9 @@ ReplayFileResult parseReplay(const std::filesystem::path& path) {
         auto json = parseRes.unwrap();
         if (json.contains("fps") && json["fps"].isNumber()) {
             res.fps = static_cast<float>(json["fps"].as<double>().unwrapOr(240.0));
+        }
+        if (json.contains("duration") && json["duration"].isNumber()) {
+            res.duration = static_cast<float>(json["duration"].as<double>().unwrapOr(0.0));
         }
 
         auto processItem = [&](const matjson::Value& obj) {

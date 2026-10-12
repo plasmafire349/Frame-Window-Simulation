@@ -37,11 +37,11 @@ inline cocos2d::ccColor4F getTierColor(ClickTier tier) {
 
 inline std::string getTierSound(ClickTier tier) {
     switch (tier) {
-        case ClickTier::A: return "chestClick.ogg";
-        case ClickTier::B: return "crystal01.ogg";
-        case ClickTier::C: return "buyItem01.ogg";
-        case ClickTier::D: return "counter003.ogg";
-        case ClickTier::E: return "chestOpen01.ogg";
+        case ClickTier::A: return "tierA.mp3";
+        case ClickTier::B: return "tierB.mp3";
+        case ClickTier::C: return "tierC.wav";
+        case ClickTier::D: return "tierD.mp3";
+        case ClickTier::E: return "tierE.mp3";
         default:           return "";
     }
 }

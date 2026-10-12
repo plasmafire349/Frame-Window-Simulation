@@ -29,6 +29,7 @@ protected:
     void onExport(cocos2d::CCObject*);
     void onToggleMarkers(cocos2d::CCObject*);
     void onToggleAudio(cocos2d::CCObject*);
+    void onToggleBotOnly(cocos2d::CCObject*);
     void onClose(cocos2d::CCObject*);
 
 public:
@@ -37,5 +38,5 @@ public:
 
 int getCurrentPhysicsFrame();
 void triggerPlayLayerHUDUpdate();
-void spawnMarkerInPlayLayer(cocos2d::CCPoint pos, const std::string& displayStr, cocos2d::ccColor4F color, int clickIndex = 0);
+void spawnMarkerInPlayLayer(cocos2d::CCPoint pos, cocos2d::ccColor4F color, int clickIndex = 0, bool isRelease = false);
 void removeMarkerInPlayLayer(int clickIndex);

@@ -14,6 +14,7 @@ struct RawReplayAction {
 struct ReplayFileResult {
     std::vector<RawReplayAction> actions;
     float fps = 240.0f;
+    float duration = 0.0f;
 };
 
 ReplayFileResult parseReplay(const std::filesystem::path& path);

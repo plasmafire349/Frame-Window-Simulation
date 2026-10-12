@@ -13,6 +13,54 @@
 
 using namespace geode::prelude;
 
+namespace eclipse::__internal__ {
+    constexpr size_t API_VERSION = 1;
+
+    struct VTable {
+        bool(*Config_getBool)(std::string_view, bool const&) = nullptr;
+        int(*Config_getInt)(std::string_view, int const&) = nullptr;
+        double(*Config_getDouble)(std::string_view, double const&) = nullptr;
+        std::string(*Config_getString)(std::string_view, std::string const&) = nullptr;
+        std::string_view(*Config_getStringView)(std::string_view, std::string_view const&) = nullptr;
+        bool(*Config_getBoolInternal)(std::string_view, bool const&) = nullptr;
+        int(*Config_getIntInternal)(std::string_view, int const&) = nullptr;
+        double(*Config_getDoubleInternal)(std::string_view, double const&) = nullptr;
+        std::string(*Config_getStringInternal)(std::string_view, std::string const&) = nullptr;
+        std::string_view(*Config_getStringViewInternal)(std::string_view, std::string_view const&) = nullptr;
+    };
+
+    struct FetchVTableEvent : geode::Event<FetchVTableEvent, bool(VTable&, size_t)> {
+        using Event::Event;
+    };
+
+    inline VTable const& getVTable() {
+        static VTable vtable{};
+        static bool initialized = false;
+        if (!initialized) {
+            initialized = FetchVTableEvent().send(vtable, API_VERSION);
+        }
+        return vtable;
+    }
+}
+
+inline bool isBotRunning() {
+    if (ClickShowcase::get().m_clicks.empty()) {
+        return false;
+    }
+
+    if (!ClickShowcase::get().m_botOnly) {
+        return true;
+    }
+
+    auto& vtable = eclipse::__internal__::getVTable();
+    if (vtable.Config_getInt) {
+        int state = vtable.Config_getInt("bot.state", 0);
+        return (state == 2); // 2 = Playback
+    }
+
+    return true;
+}
+
 struct ActiveMarker {
     Ref<CCNode> node;
     CCPoint worldPos;
@@ -78,7 +126,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         m_fields->m_countLabels.clear();
 
-        if (!ClickShowcase::get().m_showHUD) return;
+        if (!ClickShowcase::get().m_showHUD || !isBotRunning()) return;
 
         m_fields->m_hudNode = CCNode::create();
         m_fields->m_hudNode->setPosition({ 5.f, CCDirector::get()->getWinSize().height - 5.f });
@@ -211,7 +259,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
     }
 
-    void spawnFrameWindowMarker(CCPoint pos, const std::string& displayStr, ccColor4F color, int clickIndex = 0) {
+    void spawnFrameWindowMarker(CCPoint pos, ccColor4F color, int clickIndex = 0, bool isRelease = false) {
         if (clickIndex > 0) {
             this->removeMarkerByClickIndex(clickIndex);
         }
@@ -236,7 +284,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 2.f, { r, g, b, a });
 
         // If release action: add center dot for clear visual distinction matching FWC
-        if (displayStr.find("Rel") != std::string::npos) {
+        if (isRelease) {
             CCPoint innerVerts[32];
             float innerRadius = 4.0f;
             for (int i = 0; i < 32; i++) {
@@ -247,18 +295,6 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
 
         markerNode->addChild(circle, 0);
-
-        auto label = CCLabelBMFont::create(displayStr.c_str(), "bigFont.fnt");
-        label->setAnchorPoint({ 1.f, 0.5f });
-        label->setPosition({ -18.f, 0.f });
-        label->setScale(0.5f);
-        label->setColor({
-            static_cast<GLubyte>(color.r * 255),
-            static_cast<GLubyte>(color.g * 255),
-            static_cast<GLubyte>(color.b * 255)
-        });
-        label->setOpacity(static_cast<GLubyte>(color.a * 255));
-        markerNode->addChild(label, 1);
 
         if (this->m_uiLayer) {
             this->m_uiLayer->addChild(markerNode);
@@ -288,7 +324,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         float minY = -margin;
         float maxY = winSize.height + margin;
 
-        // 1. Update positions of existing markers and cull offscreen
+        // Update positions of existing markers and cull offscreen
         for (auto it = m_fields->m_activeMarkers.begin(); it != m_fields->m_activeMarkers.end(); ) {
             auto& marker = *it;
             if (!marker.node || !marker.node->getParent()) {
@@ -307,34 +343,6 @@ class $modify(MyPlayLayer, PlayLayer) {
                 ++it;
             }
         }
-
-        // 2. Pre-spawn markers for assigned clicks that are on-screen
-        if (ClickShowcase::get().m_showMarkers) {
-            for (auto& click : ClickShowcase::get().m_clicks) {
-                if (click.tier == ClickTier::None) continue;
-                if (click.position.x == 0.f && click.position.y == 0.f) {
-                    click.position.x = click.frame * 1.29825f;
-                    click.position.y = this->m_player1 ? this->m_player1->getPositionY() : 105.0f;
-                }
-
-                bool alreadyActive = false;
-                for (const auto& am : m_fields->m_activeMarkers) {
-                    if (am.clickIndex == click.clickIndex) {
-                        alreadyActive = true;
-                        break;
-                    }
-                }
-                if (alreadyActive) continue;
-
-                CCPoint screenPos = this->m_objectLayer->convertToWorldSpace(click.position);
-                if (screenPos.x >= minX && screenPos.x <= maxX && screenPos.y >= minY && screenPos.y <= maxY) {
-                    std::string markerText = click.isHold 
-                        ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent)
-                        : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent);
-                    this->spawnFrameWindowMarker(click.position, markerText, getTierColor(click.tier), click.clickIndex);
-                }
-            }
-        }
     }
 
     void postUpdate(float dt) {
@@ -346,6 +354,24 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto gm = GameManager::sharedState();
         if (gm->getPlayLayer() && !gm->getPlayLayer()->m_isPaused) {
             if (this->m_player1 && !this->m_player1->m_isDead) {
+                bool botActive = isBotRunning();
+                if (m_fields->m_hudNode) {
+                    m_fields->m_hudNode->setVisible(botActive && ClickShowcase::get().m_showHUD);
+                } else if (botActive && ClickShowcase::get().m_showHUD) {
+                    this->rebuildHUD();
+                }
+
+                if (!botActive) {
+                    for (auto& marker : m_fields->m_activeMarkers) {
+                        if (marker.node) marker.node->setVisible(false);
+                    }
+                    return;
+                }
+
+                for (auto& marker : m_fields->m_activeMarkers) {
+                    if (marker.node) marker.node->setVisible(true);
+                }
+
                 if (m_fields->m_checkpointRemovalActive) {
                     armCheckpointRestore(m_fields->m_checkpointRemovalRestoreFrame);
                     applyRestoredFrame();
@@ -362,6 +388,7 @@ class $modify(MyPlayLayer, PlayLayer) {
 
     void onPhysicsStep() {
         if (!this->m_player1 || this->m_player1->m_isDead) return;
+        if (!isBotRunning()) return;
 
         if (m_fields->m_restoreFrameArmed) {
             applyRestoredFrame();
@@ -422,19 +449,21 @@ class $modify(MyPlayLayer, PlayLayer) {
                         CCPoint pPos = (click.isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
                         click.position = pPos;
 
-                        // Spawn marker at player position
+                        // Spawn marker at player position: circle on that position, nothing else
                         if (ClickShowcase::get().m_showMarkers) {
-                            std::string markerText = click.isHold 
-                                ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent)
-                                : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent);
-                            this->spawnFrameWindowMarker(click.position, markerText, getTierColor(click.tier), click.clickIndex);
+                            this->spawnFrameWindowMarker(click.position, getTierColor(click.tier), click.clickIndex, !click.isHold);
                         }
 
-                        // 3. Play sound
+                        // Play sound
                         if (!skipAudio && ClickShowcase::get().m_playAudio) {
                             std::string sfx = getTierSound(click.tier);
                             if (!sfx.empty()) {
-                                FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
+                                auto resPath = geode::Mod::get()->getResourcesDir() / sfx;
+                                if (std::filesystem::exists(resPath)) {
+                                    FMODAudioEngine::sharedEngine()->playEffect(resPath.string().c_str(), 1.0f, 0.0f, 1.0f);
+                                } else {
+                                    FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
+                                }
                             }
                         }
                     }
@@ -614,9 +643,9 @@ void triggerPlayLayerHUDUpdate() {
     }
 }
 
-void spawnMarkerInPlayLayer(CCPoint pos, const std::string& displayStr, ccColor4F color, int clickIndex) {
+void spawnMarkerInPlayLayer(CCPoint pos, ccColor4F color, int clickIndex, bool isRelease) {
     if (auto pl = PlayLayer::get()) {
-        static_cast<MyPlayLayer*>(pl)->spawnFrameWindowMarker(pos, displayStr, color, clickIndex);
+        static_cast<MyPlayLayer*>(pl)->spawnFrameWindowMarker(pos, color, clickIndex, isRelease);
     }
 }
 
