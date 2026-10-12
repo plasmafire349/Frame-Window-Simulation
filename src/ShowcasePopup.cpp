@@ -443,22 +443,26 @@ void ShowcasePopup::onRowTierClicked(CCObject* sender) {
                 // If position is not set yet, or if player is currently near this click
                 if (c.position.x == 0.f && c.position.y == 0.f) {
                     if (pl->m_player1) {
-                        int currFrame = getCurrentPhysicsFrame();
-                        if (std::abs(currFrame - c.frame) <= 120) {
+                        float currPercent = pl->getCurrentPercent();
+                        if (std::abs(currPercent - c.percent) <= 1.5f) {
                             c.position = pl->m_player1->getPosition();
-                        } else if (pl->m_levelLength > 0.f) {
-                            c.position.x = (c.percent / 100.0f) * pl->m_levelLength;
+                        } else {
+                            float speedMult = (pl->m_player1->m_playerSpeed > 0.1f) ? pl->m_player1->m_playerSpeed : 1.0f;
+                            c.position.x = c.frame * 1.29825f * speedMult;
                             c.position.y = pl->m_player1->getPositionY();
                         }
+                    } else {
+                        c.position.x = c.frame * 1.29825f;
+                        c.position.y = 105.0f;
                     }
                 }
 
-                if (c.tier != ClickTier::None && (c.position.x != 0.f || c.position.y != 0.f)) {
+                if (c.tier != ClickTier::None) {
                     std::string markerText = c.isHold
                         ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(c.tier), c.clickIndex, c.percent)
                         : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(c.tier), c.clickIndex, c.percent);
                     spawnMarkerInPlayLayer(c.position, markerText, getTierColor(c.tier), c.clickIndex);
-                } else if (c.tier == ClickTier::None) {
+                } else {
                     removeMarkerInPlayLayer(c.clickIndex);
                 }
                 break;

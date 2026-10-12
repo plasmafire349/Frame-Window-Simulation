@@ -310,9 +310,12 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         // 2. Pre-spawn markers for assigned clicks that are on-screen
         if (ClickShowcase::get().m_showMarkers) {
-            for (const auto& click : ClickShowcase::get().m_clicks) {
+            for (auto& click : ClickShowcase::get().m_clicks) {
                 if (click.tier == ClickTier::None) continue;
-                if (click.position.x == 0.f && click.position.y == 0.f) continue;
+                if (click.position.x == 0.f && click.position.y == 0.f) {
+                    click.position.x = click.frame * 1.29825f;
+                    click.position.y = this->m_player1 ? this->m_player1->getPositionY() : 105.0f;
+                }
 
                 bool alreadyActive = false;
                 for (const auto& am : m_fields->m_activeMarkers) {
@@ -372,9 +375,6 @@ class $modify(MyPlayLayer, PlayLayer) {
             if (click.frame == currentFrame) {
                 CCPoint playerPos = (click.isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
                 click.position = playerPos;
-                if (this->m_levelLength > 0.f) {
-                    click.percent = std::clamp((playerPos.x / this->m_levelLength) * 100.0f, 0.0f, 100.0f);
-                }
             }
         }
 
@@ -418,16 +418,11 @@ class $modify(MyPlayLayer, PlayLayer) {
                         updatedTiers.push_back(tid);
                         updatedTiers.push_back(0);
 
-                        // 1. Ensure position is set
-                        if (click.position.x == 0.f && click.position.y == 0.f) {
-                            CCPoint pPos = (click.isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
-                            click.position = pPos;
-                            if (this->m_levelLength > 0.f) {
-                                click.percent = std::clamp((pPos.x / this->m_levelLength) * 100.0f, 0.0f, 100.0f);
-                            }
-                        }
+                        // Capture player position at this exact trigger frame
+                        CCPoint pPos = (click.isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
+                        click.position = pPos;
 
-                        // 2. Spawn marker at player position
+                        // Spawn marker at player position
                         if (ClickShowcase::get().m_showMarkers) {
                             std::string markerText = click.isHold 
                                 ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent)
