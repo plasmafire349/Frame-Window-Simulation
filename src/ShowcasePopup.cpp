@@ -777,14 +777,16 @@ void ShowcasePopup::startPlaybackPreview(const std::string& filename) {
 
     this->removeFromParentAndCleanup(true);
 
-    if (auto pl = PlayLayer::get()) {
-        pl->resetLevel();
-        if (auto pauseLayer = CCScene::get()->getChildByType<PauseLayer>(0)) {
-            pauseLayer->onResume(nullptr);
-        }
+    auto scene = CCDirector::sharedDirector()->getRunningScene();
+    auto pauseLayer = scene ? scene->getChildByType<PauseLayer>(0) : nullptr;
+    if (pauseLayer) {
+        // Normal in-game restart path (also resumes), safe with other mods' hooks.
+        pauseLayer->onRestart(nullptr);
         Notification::create(
             fmt::format("Previewing: {}", path.filename().string()),
             NotificationIcon::Success
         )->show();
+    } else {
+        ClickShowcase::get().m_isPreviewing = false;
     }
 }
