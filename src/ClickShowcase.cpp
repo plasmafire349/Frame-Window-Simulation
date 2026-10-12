@@ -128,7 +128,7 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
         info.isHold = act.hold;
         info.isPlayer2 = act.isPlayer2;
         info.percent = std::clamp((static_cast<float>(act.frame) / static_cast<float>(totalFrames)) * 100.0f, 0.0f, 100.0f);
-        info.position = { act.frame * 1.29825f, 105.0f };
+        info.position = ccp(act.frame * 1.29825f, 105.0f);
 
         // Every click or release defaults to None
         info.tier = ClickTier::None;
