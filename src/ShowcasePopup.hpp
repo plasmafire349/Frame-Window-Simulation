@@ -25,8 +25,13 @@ protected:
     void onRowTogglePlayer(cocos2d::CCObject* sender);
     void onQuickAssignCurrent(cocos2d::CCObject* sender);
 
+    CCMenuItemSpriteExtra* m_recordBtn = nullptr;
+    cocos2d::CCLabelBMFont* m_recStatusLabel = nullptr;
+
     void onImport(cocos2d::CCObject*);
     void onExport(cocos2d::CCObject*);
+    void onToggleRecord(cocos2d::CCObject*);
+    void onOpenRecordingsFolder(cocos2d::CCObject*);
     void onToggleMarkers(cocos2d::CCObject*);
     void onToggleAudio(cocos2d::CCObject*);
     void onToggleBotOnly(cocos2d::CCObject*);
@@ -38,5 +43,6 @@ public:
 
 int getCurrentPhysicsFrame();
 void triggerPlayLayerHUDUpdate();
+void togglePlayLayerRecording();
 void spawnMarkerInPlayLayer(cocos2d::CCPoint pos, cocos2d::ccColor4F color, int clickIndex = 0, bool isRelease = false);
 void removeMarkerInPlayLayer(int clickIndex);

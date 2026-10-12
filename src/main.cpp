@@ -73,6 +73,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         bool m_key4Prev = false;
         bool m_key5Prev = false;
         bool m_key0Prev = false;
+
+        // Recording indicator and hotkey
+        Ref<CCNode> m_recIndicator = nullptr;
+        bool m_recComboPrev = false;
     };
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
@@ -97,6 +101,8 @@ class $modify(MyPlayLayer, PlayLayer) {
         m_fields->m_key4Prev = false;
         m_fields->m_key5Prev = false;
         m_fields->m_key0Prev = false;
+        m_fields->m_recComboPrev = false;
+        m_fields->m_recIndicator = nullptr;
 
         ClickShowcase::get().reset();
 
@@ -438,6 +444,104 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
     }
 
+    void onRecordPlayerInput(bool isHold, bool isPlayer2) {
+        if (!ClickShowcase::get().m_isRecording) return;
+        if (!this->m_player1 || this->m_player1->m_isDead || this->m_isPaused) return;
+
+        CCPoint playerPos = (isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
+        int currFrame = m_fields->m_currentFrame;
+        float currPercent = this->getCurrentPercent();
+
+        ClickMarkerInfo info;
+        info.clickIndex = static_cast<int>(ClickShowcase::get().m_recordedClicks.size()) + 1;
+        info.frame = currFrame;
+        info.percent = currPercent;
+        info.position = playerPos;
+        info.tier = ClickTier::None;
+        info.isHold = isHold;
+        info.isPlayer2 = isPlayer2;
+        info.hasTriggered = false;
+
+        ClickShowcase::get().m_recordedClicks.push_back(info);
+    }
+
+    void updateRecIndicator(bool visible) {
+        if (!visible) {
+            if (m_fields->m_recIndicator) {
+                m_fields->m_recIndicator->setVisible(false);
+            }
+            return;
+        }
+
+        if (!m_fields->m_recIndicator) {
+            auto winSize = CCDirector::sharedDirector()->getWinSize();
+            auto node = CCNode::create();
+            node->setID("rec-indicator"_spr);
+            node->setPosition({ winSize.width - 55.f, winSize.height - 18.f });
+
+            auto dot = CCDrawNode::create();
+            CCPoint verts[32];
+            for (int i = 0; i < 32; i++) {
+                float a = i * (3.14159f * 2.f) / 32.f;
+                verts[i] = CCPoint{ 5.f * cosf(a), 5.f * sinf(a) };
+            }
+            dot->drawPolygon(verts, 32, { 1.0f, 0.15f, 0.15f, 1.0f }, 0.f, { 0, 0, 0, 0 });
+            dot->setPosition({ 0.f, 0.f });
+            node->addChild(dot);
+
+            auto fadeOut = CCFadeTo::create(0.45f, 70);
+            auto fadeIn = CCFadeTo::create(0.45f, 255);
+            auto pulse = CCRepeatForever::create(CCSequence::create(fadeOut, fadeIn, nullptr));
+            dot->runAction(pulse);
+
+            auto lbl = CCLabelBMFont::create("REC", "bigFont.fnt");
+            lbl->setScale(0.36f);
+            lbl->setColor({ 255, 60, 60 });
+            lbl->setAnchorPoint({ 0.f, 0.5f });
+            lbl->setPosition({ 9.f, 0.f });
+            node->addChild(lbl);
+
+            if (this->m_uiLayer) this->m_uiLayer->addChild(node, 9999);
+            else this->addChild(node, 9999);
+
+            m_fields->m_recIndicator = node;
+        }
+
+        m_fields->m_recIndicator->setVisible(true);
+    }
+
+    void toggleRecording() {
+        bool newState = !ClickShowcase::get().m_isRecording;
+        ClickShowcase::get().m_isRecording = newState;
+
+        if (newState) {
+            ClickShowcase::get().m_recordedClicks.clear();
+            this->updateRecIndicator(true);
+            Notification::create("Recording Started (Ctrl+Shift+J to stop)", NotificationIcon::Info)->show();
+        } else {
+            this->updateRecIndicator(false);
+
+            std::string levelName = "level";
+            if (this->m_level) {
+                levelName = this->m_level->m_levelName;
+            }
+            std::string savedPath = ClickShowcase::get().saveCurrentRecording(levelName);
+            size_t count = ClickShowcase::get().m_clicks.size();
+
+            if (!savedPath.empty()) {
+                Notification::create(
+                    fmt::format("Recording saved! ({} inputs in fwc_recordings/)", count),
+                    NotificationIcon::Success
+                )->show();
+            } else {
+                Notification::create("Recording stopped (0 inputs recorded)", NotificationIcon::Warning)->show();
+            }
+
+            this->rebuildHUD();
+            this->syncAllAssignedMarkers();
+        }
+    }
+
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
         this->updateAndCleanMarkers();
@@ -452,6 +556,8 @@ class $modify(MyPlayLayer, PlayLayer) {
                 } else if (ClickShowcase::get().m_showHUD) {
                     this->rebuildHUD();
                 }
+
+                this->updateRecIndicator(ClickShowcase::get().m_isRecording);
 
                 bool botActive = isBotRunning();
 
@@ -477,7 +583,7 @@ class $modify(MyPlayLayer, PlayLayer) {
 
                 this->updateAndCleanMarkers();
 
-                // ── Keyboard Hotkeys: 1->A, 2->B, 3->C, 4->D, 5->E, 0->None ──
+                // ── Keyboard Hotkeys: 1->A, 2->B, 3->C, 4->D, 5->E, 0->None, Ctrl+Shift+J->Record ──
                 #ifdef _WIN32
                 HWND fgWnd = GetForegroundWindow();
                 DWORD procId = 0;
@@ -491,6 +597,16 @@ class $modify(MyPlayLayer, PlayLayer) {
                     }
 
                     if (!hasModal && !this->m_isPaused) {
+                        bool isCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+                        bool isShift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
+                        bool isJ = (GetAsyncKeyState('J') & 0x8000) != 0;
+                        bool recCombo = isCtrl && isShift && isJ;
+
+                        if (recCombo && !m_fields->m_recComboPrev) {
+                            this->toggleRecording();
+                        }
+                        m_fields->m_recComboPrev = recCombo;
+
                         bool k1 = (GetAsyncKeyState('1') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) != 0;
                         bool k2 = (GetAsyncKeyState('2') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) != 0;
                         bool k3 = (GetAsyncKeyState('3') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) != 0;
@@ -735,6 +851,24 @@ class $modify(MyPlayerObject, PlayerObject) {
             static_cast<MyPlayLayer*>(pl)->onPhysicsStep();
         }
     }
+
+    void pushButton(PlayerButton p0) {
+        PlayerObject::pushButton(p0);
+        auto pl = PlayLayer::get();
+        if (pl && !pl->m_isPaused && ClickShowcase::get().m_isRecording) {
+            bool isP2 = (this == pl->m_player2);
+            static_cast<MyPlayLayer*>(pl)->onRecordPlayerInput(true, isP2);
+        }
+    }
+
+    void releaseButton(PlayerButton p0) {
+        PlayerObject::releaseButton(p0);
+        auto pl = PlayLayer::get();
+        if (pl && !pl->m_isPaused && ClickShowcase::get().m_isRecording) {
+            bool isP2 = (this == pl->m_player2);
+            static_cast<MyPlayLayer*>(pl)->onRecordPlayerInput(false, isP2);
+        }
+    }
 };
 
 class $modify(MyPauseLayer, PauseLayer) {
@@ -775,6 +909,18 @@ void triggerPlayLayerHUDUpdate() {
         auto myPl = static_cast<MyPlayLayer*>(pl);
         myPl->rebuildHUD();
         myPl->syncAllAssignedMarkers();
+    }
+}
+
+void togglePlayLayerRecording() {
+    if (auto pl = PlayLayer::get()) {
+        static_cast<MyPlayLayer*>(pl)->toggleRecording();
+    } else {
+        bool newState = !ClickShowcase::get().m_isRecording;
+        ClickShowcase::get().m_isRecording = newState;
+        if (!newState) {
+            ClickShowcase::get().saveCurrentRecording("recording");
+        }
     }
 }
 

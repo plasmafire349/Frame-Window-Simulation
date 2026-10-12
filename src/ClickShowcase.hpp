@@ -35,6 +35,13 @@ public:
     int m_lastActionIndex = 0;
     std::map<ClickTier, int> m_tierCounts;
 
+    // Live Recording
+    bool m_isRecording = false;
+    std::vector<ClickMarkerInfo> m_recordedClicks;
+
+    std::filesystem::path getRecordingsDir();
+    std::string saveCurrentRecording(const std::string& levelName);
+
     void loadReplayFile(const std::filesystem::path& path, float levelLength);
     void exportClicksJson(const std::filesystem::path& path);
     void loadClicksJson(const std::filesystem::path& path);

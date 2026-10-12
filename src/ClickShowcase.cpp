@@ -3,6 +3,9 @@
 #include <fstream>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
+#include <ctime>
+#include <cctype>
 
 using namespace geode::prelude;
 
@@ -306,3 +309,65 @@ int ClickShowcase::getTierHitCount(ClickTier tier) const {
     return count;
 }
 
+std::filesystem::path ClickShowcase::getRecordingsDir() {
+    auto path = std::filesystem::current_path() / "fwc_recordings";
+    std::error_code ec;
+    std::filesystem::create_directories(path, ec);
+    return path;
+}
+
+std::string ClickShowcase::saveCurrentRecording(const std::string& levelName) {
+    if (m_recordedClicks.empty()) return "";
+
+    auto dir = getRecordingsDir();
+
+    auto now = std::chrono::system_clock::now();
+    std::time_t tt = std::chrono::system_clock::to_time_t(now);
+    std::tm tm = *std::localtime(&tt);
+    char timeBuf[64];
+    std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d_%H-%M-%S", &tm);
+
+    std::string safeName = levelName.empty() ? "level" : levelName;
+    for (char& c : safeName) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
+            c = '_';
+        }
+    }
+
+    std::string filename = fmt::format("{}_{}.json", safeName, timeBuf);
+    auto fullPath = dir / filename;
+
+    std::vector<matjson::Value> arr;
+    for (const auto& click : m_recordedClicks) {
+        matjson::Value item;
+        item["click"] = click.clickIndex;
+        item["frame"] = click.frame;
+        item["percent"] = click.percent;
+        std::string tierStr(1, static_cast<char>(click.tier));
+        item["tier"] = tierStr;
+        item["hold"] = click.isHold;
+        item["p2"] = click.isPlayer2;
+        item["x"] = click.position.x;
+        item["y"] = click.position.y;
+        arr.push_back(item);
+    }
+
+    matjson::Value root = matjson::makeObject({
+        { "level", safeName },
+        { "timestamp", std::string(timeBuf) },
+        { "total_inputs", static_cast<int>(m_recordedClicks.size()) },
+        { "clicks", matjson::Value(arr) }
+    });
+
+    std::ofstream f(fullPath);
+    if (f) {
+        f << root.dump(matjson::NO_INDENTATION);
+        f.close();
+    }
+
+    // Immediately make the recorded clicks active in the showcase
+    m_clicks = m_recordedClicks;
+    reset();
+
+    return fullPath.string();
+}

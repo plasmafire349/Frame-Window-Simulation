@@ -5,6 +5,13 @@
 #include <sstream>
 #include <algorithm>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 using namespace geode::prelude;
 
 // ClippedMenu: Prevents touches outside ScrollLayer bounds from triggering cell buttons
@@ -67,10 +74,41 @@ bool ShowcasePopup::init() {
     title->setPosition({ winSize.width / 2.f, winSize.height / 2.f + 124.f });
     m_mainLayer->addChild(title);
 
+    bool isRec = ClickShowcase::get().m_isRecording;
+    m_recStatusLabel = CCLabelBMFont::create(
+        isRec ? "* RECORDING ACTIVE *" : "",
+        "bigFont.fnt"
+    );
+    m_recStatusLabel->setScale(0.32f);
+    m_recStatusLabel->setColor({ 255, 60, 60 });
+    m_recStatusLabel->setPosition({ winSize.width / 2.f, winSize.height / 2.f + 112.f });
+    m_mainLayer->addChild(m_recStatusLabel);
+
     // Top menu
     auto topMenu = CCMenu::create();
     topMenu->setPosition(winSize / 2.f);
     m_mainLayer->addChild(topMenu);
+
+    // Record button (top-left)
+    auto recSpr = ButtonSprite::create(
+        isRec ? "Stop REC" : "Record",
+        "goldFont.fnt",
+        isRec ? "GJ_button_06.png" : "GJ_button_01.png",
+        0.50f
+    );
+    m_recordBtn = CCMenuItemSpriteExtra::create(
+        recSpr, this, menu_selector(ShowcasePopup::onToggleRecord)
+    );
+    m_recordBtn->setPosition({ -175.f, 126.f });
+    topMenu->addChild(m_recordBtn);
+
+    // Folder button (top-left, opens fwc_recordings)
+    auto folderSpr = ButtonSprite::create("Folder", "goldFont.fnt", "GJ_button_04.png", 0.50f);
+    auto folderBtn = CCMenuItemSpriteExtra::create(
+        folderSpr, this, menu_selector(ShowcasePopup::onOpenRecordingsFolder)
+    );
+    folderBtn->setPosition({ -115.f, 126.f });
+    topMenu->addChild(folderBtn);
 
     // Close button (top right)
     auto closeSpr = CCSprite::createWithSpriteFrameName("GJ_closeBtn_001.png");
@@ -614,6 +652,7 @@ void ShowcasePopup::onToggleBotOnly(CCObject*) {
 
 void ShowcasePopup::onImport(CCObject*) {
     file::FilePickOptions options;
+    options.defaultPath = ClickShowcase::get().getRecordingsDir();
     options.filters.push_back({
         "Replay / JSON Files (*.gdr2, *.gdr, *.json)",
         { "*.gdr2", "*.gdr", "*.json" }
@@ -660,4 +699,30 @@ void ShowcasePopup::onExport(CCObject*) {
             ClickShowcase::get().exportClicksJson(path);
         }
     });
+}
+
+void ShowcasePopup::onToggleRecord(CCObject*) {
+    togglePlayLayerRecording();
+
+    bool isRec = ClickShowcase::get().m_isRecording;
+    if (m_recordBtn) {
+        if (auto spr = typeinfo_cast<ButtonSprite*>(m_recordBtn->getNormalImage())) {
+            spr->setString(isRec ? "Stop REC" : "Record");
+        }
+    }
+    if (m_recStatusLabel) {
+        m_recStatusLabel->setString(isRec ? "* RECORDING ACTIVE *" : "");
+    }
+
+    refreshList(true);
+}
+
+void ShowcasePopup::onOpenRecordingsFolder(CCObject*) {
+    auto dir = ClickShowcase::get().getRecordingsDir();
+#ifdef _WIN32
+    ShellExecuteA(NULL, "open", dir.string().c_str(), NULL, NULL, SW_SHOWNORMAL);
+#else
+    file::openFolder(dir);
+#endif
+    Notification::create("Opened fwc_recordings folder", NotificationIcon::Info)->show();
 }
