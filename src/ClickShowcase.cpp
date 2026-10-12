@@ -46,10 +46,30 @@ bool ClickShowcase::assignByClick(int clickIndex, ClickTier tier) {
     return found;
 }
 
+ClickTier ClickShowcase::cycleClickTier(int clickIndex) {
+    ClickTier nextTier = ClickTier::A;
+    for (auto& click : m_clicks) {
+        if (click.clickIndex == clickIndex) {
+            switch (click.tier) {
+                case ClickTier::A:    nextTier = ClickTier::B; break;
+                case ClickTier::B:    nextTier = ClickTier::C; break;
+                case ClickTier::C:    nextTier = ClickTier::D; break;
+                case ClickTier::D:    nextTier = ClickTier::E; break;
+                case ClickTier::E:    nextTier = ClickTier::None; break;
+                case ClickTier::None: nextTier = ClickTier::A; break;
+                default:              nextTier = ClickTier::A; break;
+            }
+            click.tier = nextTier;
+            m_manualClickTiers[clickIndex] = nextTier;
+            return nextTier;
+        }
+    }
+    return nextTier;
+}
+
 bool ClickShowcase::assignByPercent(float percent, ClickTier tier, float tolerance) {
     if (m_clicks.empty()) return false;
 
-    // Find the closest click to the requested percent
     ClickMarkerInfo* closest = nullptr;
     float minDiff = 999999.f;
 
@@ -61,12 +81,7 @@ bool ClickShowcase::assignByPercent(float percent, ClickTier tier, float toleran
         }
     }
 
-    if (closest && minDiff <= tolerance) {
-        closest->tier = tier;
-        m_manualClickTiers[closest->clickIndex] = tier;
-        return true;
-    } else if (closest) {
-        // Fallback: assign closest anyway
+    if (closest) {
         closest->tier = tier;
         m_manualClickTiers[closest->clickIndex] = tier;
         return true;
@@ -100,29 +115,21 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
 
     m_fps = res.fps;
 
-    std::vector<RawReplayAction> validActions;
-    for (const auto& act : res.actions) {
-        if (act.frame > 5) {
-            validActions.push_back(act);
-        }
-    }
-
-    if (validActions.empty()) return;
-
-    int totalFrames = validActions.back().frame;
+    int totalFrames = res.actions.back().frame;
     if (totalFrames <= 0) totalFrames = 1;
 
     int index = 1;
-    for (size_t i = 0; i < validActions.size(); i++) {
-        const auto& act = validActions[i];
+    for (size_t i = 0; i < res.actions.size(); i++) {
+        const auto& act = res.actions[i];
         ClickMarkerInfo info;
         info.frame = act.frame;
         info.clickIndex = index++;
+        info.isHold = act.hold;
         info.isPlayer2 = act.isPlayer2;
         info.percent = std::clamp((static_cast<float>(act.frame) / static_cast<float>(totalFrames)) * 100.0f, 0.0f, 100.0f);
 
         // Baseline tier by delta
-        int prevFrame = (i > 0) ? validActions[i - 1].frame : 0;
+        int prevFrame = (i > 0) ? res.actions[i - 1].frame : 0;
         int delta = act.frame - prevFrame;
 
         if (delta < 15) {
@@ -140,13 +147,16 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
         m_clicks.push_back(info);
     }
 
-    // Apply any manual click and percent rules
     applyAssignments();
 
-    log::info("Loaded {} clicks for Click Showcase", m_clicks.size());
+    log::info("Loaded {} actions from replay dynamically", m_clicks.size());
 }
 
 cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
+    if (info.tier == ClickTier::None) {
+        return nullptr;
+    }
+
     auto markerNode = CCNode::create();
     markerNode->setID("click-showcase-marker"_spr);
 
@@ -160,12 +170,12 @@ cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
 
     ccColor4F color = getTierColor(info.tier);
 
-    // Double ring visual style
+    // Double ring
     circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 4.0f, { 0.f, 0.f, 0.f, color.a });
     circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 2.0f, color);
     markerNode->addChild(circle, 0);
 
-    // Label with Tier, Click Index, and Percent
+    // Label
     std::string text = fmt::format("{} #{} ({:.1f}%)", static_cast<char>(info.tier), info.clickIndex, info.percent);
     auto label = CCLabelBMFont::create(text.c_str(), "bigFont.fnt");
     label->setAnchorPoint({ 1.0f, 0.5f });
@@ -199,32 +209,40 @@ void ClickShowcase::onPhysicsStep(PlayLayer* layer) {
         if (!click.hasTriggered && currentFrame >= click.frame) {
             click.hasTriggered = true;
             m_currentClicksHit = click.clickIndex;
-            m_tierCounts[click.tier]++;
+            if (click.tier != ClickTier::None) {
+                m_tierCounts[click.tier]++;
+            }
 
-            if (m_showMarkers) {
+            // 1. Spawn floating marker if tier is not None
+            if (m_showMarkers && click.tier != ClickTier::None) {
                 CCPoint spawnPos = player->getPosition();
                 if (click.isPlayer2 && layer->m_player2) {
                     spawnPos = layer->m_player2->getPosition();
                 }
 
                 auto marker = createMarker(click);
-                if (layer->m_objectLayer) {
-                    marker->setPosition(layer->m_objectLayer->convertToWorldSpace(spawnPos));
-                    marker->setScale(std::abs(layer->m_objectLayer->getScaleY()));
-                } else {
-                    marker->setPosition(spawnPos);
-                }
+                if (marker) {
+                    if (layer->m_objectLayer) {
+                        marker->setPosition(layer->m_objectLayer->convertToWorldSpace(spawnPos));
+                        marker->setScale(std::abs(layer->m_objectLayer->getScaleY()));
+                    } else {
+                        marker->setPosition(spawnPos);
+                    }
 
-                if (layer->m_uiLayer) {
-                    layer->m_uiLayer->addChild(marker);
-                } else {
-                    layer->addChild(marker, 9999);
+                    if (layer->m_uiLayer) {
+                        layer->m_uiLayer->addChild(marker);
+                    } else {
+                        layer->addChild(marker, 9999);
+                    }
                 }
             }
 
-            if (m_playAudio) {
+            // 2. Play sound effect if tier is not None
+            if (m_playAudio && click.tier != ClickTier::None) {
                 std::string sfx = getTierSound(click.tier);
-                FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
+                if (!sfx.empty()) {
+                    FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
+                }
             }
         }
     }
@@ -243,6 +261,7 @@ void ClickShowcase::exportClicksJson(const std::filesystem::path& path) {
         item["percent"] = click.percent;
         std::string tierStr(1, static_cast<char>(click.tier));
         item["tier"] = tierStr;
+        item["hold"] = click.isHold;
         item["p2"] = click.isPlayer2;
         arr.push_back(item);
     }
@@ -290,6 +309,7 @@ void ClickShowcase::loadClicksJson(const std::filesystem::path& path) {
         info.percent = static_cast<float>(item["percent"].as<double>().unwrapOr(0.0));
         std::string tierStr = item["tier"].as<std::string>().unwrapOr("C");
         info.tier = !tierStr.empty() ? static_cast<ClickTier>(tierStr[0]) : ClickTier::C;
+        info.isHold = item.contains("hold") ? item["hold"].as<bool>().unwrapOr(true) : true;
         info.isPlayer2 = item.contains("p2") ? item["p2"].as<bool>().unwrapOr(false) : false;
         m_clicks.push_back(info);
     }

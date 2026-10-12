@@ -113,15 +113,13 @@ static ReplayFileResult parseGDR2(const uint8_t* buf, size_t len) {
 
         runningFrame += delta;
 
-        // We only care about press / click events (down == true)
-        if (down) {
-            RawReplayAction act;
-            act.frame = static_cast<int>(runningFrame);
-            act.hold = true;
-            act.button = (button == 0) ? 1 : button;
-            act.isPlayer2 = inP2;
-            res.actions.push_back(act);
-        }
+        // Keep every action (press and release) so all inputs are tracked
+        RawReplayAction act;
+        act.frame = static_cast<int>(runningFrame);
+        act.hold = down;
+        act.button = (button == 0) ? 1 : button;
+        act.isPlayer2 = inP2;
+        res.actions.push_back(act);
 
         if (remainingP1 > 0) remainingP1--;
     }
@@ -168,14 +166,12 @@ ReplayFileResult parseReplay(const std::filesystem::path& path) {
         auto processItem = [&](const matjson::Value& obj) {
             bool hold = obj.contains("hold") ? obj["hold"].as<bool>().unwrapOr(true)
                       : (obj.contains("down") ? obj["down"].as<bool>().unwrapOr(true) : true);
-            if (hold) {
-                RawReplayAction act;
-                act.frame = obj["frame"].as<int>().unwrapOr(0);
-                act.hold = true;
-                act.button = obj.contains("button") ? obj["button"].as<int>().unwrapOr(1) : 1;
-                act.isPlayer2 = obj.contains("p2") ? obj["p2"].as<bool>().unwrapOr(false) : false;
-                res.actions.push_back(act);
-            }
+            RawReplayAction act;
+            act.frame = obj["frame"].as<int>().unwrapOr(0);
+            act.hold = hold;
+            act.button = obj.contains("button") ? obj["button"].as<int>().unwrapOr(1) : 1;
+            act.isPlayer2 = obj.contains("p2") ? obj["p2"].as<bool>().unwrapOr(false) : false;
+            res.actions.push_back(act);
         };
 
         if (json.contains("actions") && json["actions"].isArray()) {

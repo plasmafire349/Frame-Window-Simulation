@@ -21,7 +21,7 @@ public:
     float m_fps = 240.0f;
     int m_lastTriggeredFrame = -1;
 
-    // Manual tier assignments
+    // Manual tier assignments: clickIndex -> tier
     std::map<int, ClickTier> m_manualClickTiers;
     std::vector<std::tuple<float, float, ClickTier>> m_percentRules;
 
@@ -35,6 +35,7 @@ public:
     void reset();
 
     bool assignByClick(int clickIndex, ClickTier tier);
+    ClickTier cycleClickTier(int clickIndex);
     bool assignByPercent(float percent, ClickTier tier, float tolerance = 0.75f);
     int assignByPercentRange(float minPercent, float maxPercent, ClickTier tier);
     void applyAssignments();
