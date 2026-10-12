@@ -173,10 +173,24 @@ cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
     // Double ring
     circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 4.0f, { 0.f, 0.f, 0.f, color.a });
     circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 2.0f, color);
+
+    // If Release action: add center dot for clear visual distinction
+    if (!info.isHold) {
+        CCPoint innerVerts[32];
+        float innerRadius = 4.0f;
+        for (int i = 0; i < 32; i++) {
+            float angle = i * (3.14159265f * 2.0f) / 32.0f;
+            innerVerts[i] = CCPoint{ innerRadius * cosf(angle), innerRadius * sinf(angle) };
+        }
+        circle->drawPolygon(innerVerts, 32, color, 1.0f, color);
+    }
+
     markerNode->addChild(circle, 0);
 
     // Label
-    std::string text = fmt::format("{} #{} ({:.1f}%)", static_cast<char>(info.tier), info.clickIndex, info.percent);
+    std::string text = info.isHold
+        ? fmt::format("{} #{} ({:.1f}%)", static_cast<char>(info.tier), info.clickIndex, info.percent)
+        : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(info.tier), info.clickIndex, info.percent);
     auto label = CCLabelBMFont::create(text.c_str(), "bigFont.fnt");
     label->setAnchorPoint({ 1.0f, 0.5f });
     label->setPosition({ -18.0f, 0.0f });
