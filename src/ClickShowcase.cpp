@@ -128,21 +128,8 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
         info.isPlayer2 = act.isPlayer2;
         info.percent = std::clamp((static_cast<float>(act.frame) / static_cast<float>(totalFrames)) * 100.0f, 0.0f, 100.0f);
 
-        // Baseline tier by delta
-        int prevFrame = (i > 0) ? res.actions[i - 1].frame : 0;
-        int delta = act.frame - prevFrame;
-
-        if (delta < 15) {
-            info.tier = ClickTier::A;
-        } else if (delta < 30) {
-            info.tier = ClickTier::B;
-        } else if (delta < 60) {
-            info.tier = ClickTier::C;
-        } else if (delta < 100) {
-            info.tier = ClickTier::D;
-        } else {
-            info.tier = ClickTier::E;
-        }
+        // Every click or release defaults to None
+        info.tier = ClickTier::None;
 
         m_clicks.push_back(info);
     }
@@ -321,8 +308,8 @@ void ClickShowcase::loadClicksJson(const std::filesystem::path& path) {
         info.clickIndex = item["click"].as<int>().unwrapOr(0);
         info.frame = item["frame"].as<int>().unwrapOr(0);
         info.percent = static_cast<float>(item["percent"].as<double>().unwrapOr(0.0));
-        std::string tierStr = item["tier"].as<std::string>().unwrapOr("C");
-        info.tier = !tierStr.empty() ? static_cast<ClickTier>(tierStr[0]) : ClickTier::C;
+        std::string tierStr = item["tier"].as<std::string>().unwrapOr("-");
+        info.tier = !tierStr.empty() ? static_cast<ClickTier>(tierStr[0]) : ClickTier::None;
         info.isHold = item.contains("hold") ? item["hold"].as<bool>().unwrapOr(true) : true;
         info.isPlayer2 = item.contains("p2") ? item["p2"].as<bool>().unwrapOr(false) : false;
         m_clicks.push_back(info);
@@ -330,3 +317,36 @@ void ClickShowcase::loadClicksJson(const std::filesystem::path& path) {
 
     geode::Notification::create(fmt::format("Loaded {} clicks from JSON!", m_clicks.size()).c_str(), geode::NotificationIcon::Success)->show();
 }
+
+int ClickShowcase::getTotalActiveClicks() const {
+    int count = 0;
+    for (const auto& click : m_clicks) {
+        if (click.tier != ClickTier::None) count++;
+    }
+    return count;
+}
+
+int ClickShowcase::getHitActiveClicks() const {
+    int count = 0;
+    for (const auto& click : m_clicks) {
+        if (click.hasTriggered && click.tier != ClickTier::None) count++;
+    }
+    return count;
+}
+
+int ClickShowcase::getTierAssignedCount(ClickTier tier) const {
+    int count = 0;
+    for (const auto& click : m_clicks) {
+        if (click.tier == tier) count++;
+    }
+    return count;
+}
+
+int ClickShowcase::getTierHitCount(ClickTier tier) const {
+    int count = 0;
+    for (const auto& click : m_clicks) {
+        if (click.hasTriggered && click.tier == tier) count++;
+    }
+    return count;
+}
+

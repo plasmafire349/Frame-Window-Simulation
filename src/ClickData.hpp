@@ -16,7 +16,7 @@ struct ClickMarkerInfo {
     int frame = 0;
     int clickIndex = 0;
     float percent = 0.0f;
-    ClickTier tier = ClickTier::C;
+    ClickTier tier = ClickTier::None;
     bool isHold = true; // true = press/down, false = release/up
     bool isPlayer2 = false;
     cocos2d::CCPoint position = { 0.f, 0.f };

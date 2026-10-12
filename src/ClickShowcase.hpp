@@ -40,6 +40,11 @@ public:
     int assignByPercentRange(float minPercent, float maxPercent, ClickTier tier);
     void applyAssignments();
 
+    int getTotalActiveClicks() const;
+    int getHitActiveClicks() const;
+    int getTierAssignedCount(ClickTier tier) const;
+    int getTierHitCount(ClickTier tier) const;
+
     void onPhysicsStep(PlayLayer* layer);
     void onPlayerDeath();
 

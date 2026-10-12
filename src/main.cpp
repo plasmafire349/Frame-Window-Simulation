@@ -46,17 +46,31 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         // Update HUD display
         if (m_fields->m_hudLabel && ClickShowcase::get().m_showHUD) {
-            size_t total = ClickShowcase::get().m_clicks.size();
-            int current = ClickShowcase::get().m_currentClicksHit;
-            auto& counts = ClickShowcase::get().m_tierCounts;
+            auto& sc = ClickShowcase::get();
+            size_t totalInReplay = sc.m_clicks.size();
 
             std::string text;
-            if (total > 0) {
+            if (totalInReplay > 0) {
+                int totalActive = sc.getTotalActiveClicks();
+                int hitActive = sc.getHitActiveClicks();
+
+                auto formatTier = [&](ClickTier t) -> std::string {
+                    int assigned = sc.getTierAssignedCount(t);
+                    int hit = sc.getTierHitCount(t);
+                    if (assigned > 0) {
+                        return fmt::format("{}/{}", hit, assigned);
+                    }
+                    return "0";
+                };
+
                 text = fmt::format(
                     "Clicks: {}/{}\nA:{}  B:{}  C:{}  D:{}  E:{}",
-                    current, total,
-                    counts[ClickTier::A], counts[ClickTier::B], counts[ClickTier::C],
-                    counts[ClickTier::D], counts[ClickTier::E]
+                    hitActive, totalActive,
+                    formatTier(ClickTier::A),
+                    formatTier(ClickTier::B),
+                    formatTier(ClickTier::C),
+                    formatTier(ClickTier::D),
+                    formatTier(ClickTier::E)
                 );
             } else {
                 text = "Clicks: (No replay loaded)";
@@ -67,6 +81,11 @@ class $modify(MyPlayLayer, PlayLayer) {
         } else if (m_fields->m_hudLabel) {
             m_fields->m_hudLabel->setVisible(false);
         }
+    }
+
+    void resetLevel() {
+        PlayLayer::resetLevel();
+        ClickShowcase::get().reset();
     }
 
     void destroyPlayer(PlayerObject* p0, GameObject* p1) {
