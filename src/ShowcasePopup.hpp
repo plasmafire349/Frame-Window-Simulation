@@ -12,20 +12,17 @@ protected:
     cocos2d::CCLabelBMFont* m_pageLabel = nullptr;
     CCMenuItemSpriteExtra* m_prevBtn = nullptr;
     CCMenuItemSpriteExtra* m_nextBtn = nullptr;
-    CCTextInputNode* m_rangeInput = nullptr;
 
     bool init() override;
 
     cocos2d::CCNode* createCellTemplate(int index);
-    void refreshList();
+    void refreshList(bool resetScroll = false);
 
     void onPrevPage(cocos2d::CCObject*);
     void onNextPage(cocos2d::CCObject*);
     void onRowTierClicked(cocos2d::CCObject* sender);
-    void onRowToggleDraw(cocos2d::CCObject* sender);
     void onRowDelete(cocos2d::CCObject* sender);
     void onRowTogglePlayer(cocos2d::CCObject* sender);
-    void onQuickSetRange(cocos2d::CCObject* sender);
 
     void onImport(cocos2d::CCObject*);
     void onExport(cocos2d::CCObject*);

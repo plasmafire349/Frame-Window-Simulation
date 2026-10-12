@@ -94,6 +94,17 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 };
 
+class $modify(MyPlayerObject, PlayerObject) {
+    void update(float dt) {
+        PlayerObject::update(dt);
+
+        auto pl = PlayLayer::get();
+        if (pl && !pl->m_isPaused && this == pl->m_player1) {
+            ClickShowcase::get().stepPhysicsFrame(pl);
+        }
+    }
+};
+
 class $modify(MyPauseLayer, PauseLayer) {
     void customSetup() {
         PauseLayer::customSetup();

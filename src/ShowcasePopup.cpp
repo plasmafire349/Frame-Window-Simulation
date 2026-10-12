@@ -100,9 +100,9 @@ bool ShowcasePopup::init() {
     m_nextBtn->setPosition({ 140.f, 96.f });
     topMenu->addChild(m_nextBtn);
 
-    // ── ScrollLayer Table (400 x 160) from Frame Window Counter ──────────────
-    m_scrollLayer = ScrollLayer::create({ 400.f, 160.f });
-    m_scrollLayer->setPosition({ winSize.width / 2.f - 200.f, winSize.height / 2.f - 75.f });
+    // ── ScrollLayer Table (400 x 175) ────────────────────────────────────────
+    m_scrollLayer = ScrollLayer::create({ 400.f, 175.f });
+    m_scrollLayer->setPosition({ winSize.width / 2.f - 200.f, winSize.height / 2.f - 88.f });
     m_mainLayer->addChild(m_scrollLayer);
 
     m_contentNode = CCNode::create();
@@ -116,92 +116,57 @@ bool ShowcasePopup::init() {
         m_contentNode->addChild(cell);
     }
 
-    // ── Bottom Action & Quick Assign Menu (y = winSize / 2 - 105) ────────────
+    // ── Bottom Action Menu (Cleanly spaced, no overlap) ──────────────────────
     auto bottomMenu = CCMenu::create();
     bottomMenu->setPosition(winSize / 2.f);
     m_mainLayer->addChild(bottomMenu);
 
-    // Quick range input box
-    auto inputBg = CCScale9Sprite::create("square02_small.png");
-    inputBg->setContentSize({ 75.f, 22.f });
-    inputBg->setOpacity(120);
-    inputBg->setPosition({ winSize.width / 2.f - 150.f, winSize.height / 2.f - 105.f });
-    m_mainLayer->addChild(inputBg);
-
-    m_rangeInput = CCTextInputNode::create(70.f, 18.f, "# or %", "bigFont.fnt");
-    m_rangeInput->setAllowedChars("0123456789.-% ");
-    m_rangeInput->setPosition({ winSize.width / 2.f - 150.f, winSize.height / 2.f - 105.f });
-    m_rangeInput->setScale(0.55f);
-    m_mainLayer->addChild(m_rangeInput);
-
-    // Quick Tier Assignment Buttons (A, B, C, D, E, -)
-    char tiers[] = { 'A', 'B', 'C', 'D', 'E', '-' };
-    float tierStartX = -95.f;
-    for (int i = 0; i < 6; i++) {
-        char t = tiers[i];
-        ClickTier cTier = static_cast<ClickTier>(t);
-        ccColor4F cColor = getTierColor(cTier);
-
-        std::string labelStr = (t == '-') ? "None" : std::string(1, t);
-        auto btnSpr = ButtonSprite::create(labelStr.c_str(), "bigFont.fnt", "GJ_button_01.png", (t == '-') ? 0.38f : 0.45f);
-        btnSpr->setColor({
-            static_cast<GLubyte>(cColor.r * 255),
-            static_cast<GLubyte>(cColor.g * 255),
-            static_cast<GLubyte>(cColor.b * 255)
-        });
-
-        auto tierBtn = CCMenuItemSpriteExtra::create(
-            btnSpr, this, menu_selector(ShowcasePopup::onQuickSetRange)
-        );
-        tierBtn->setTag(static_cast<int>(t));
-        tierBtn->setPosition({ tierStartX + (i * 28.f), -105.f });
-        bottomMenu->addChild(tierBtn);
-    }
-
-    // Import / Export buttons
-    auto importSpr = ButtonSprite::create("Import", "goldFont.fnt", "GJ_button_01.png", 0.55f);
+    // Import button
+    auto importSpr = ButtonSprite::create("Import", "goldFont.fnt", "GJ_button_01.png", 0.65f);
     auto importBtn = CCMenuItemSpriteExtra::create(
         importSpr, this, menu_selector(ShowcasePopup::onImport)
     );
-    importBtn->setPosition({ 90.f, -105.f });
+    importBtn->setPosition({ -120.f, -114.f });
     bottomMenu->addChild(importBtn);
 
-    auto exportSpr = ButtonSprite::create("Export", "goldFont.fnt", "GJ_button_01.png", 0.55f);
+    // Export button
+    auto exportSpr = ButtonSprite::create("Export", "goldFont.fnt", "GJ_button_01.png", 0.65f);
     auto exportBtn = CCMenuItemSpriteExtra::create(
         exportSpr, this, menu_selector(ShowcasePopup::onExport)
     );
-    exportBtn->setPosition({ 140.f, -105.f });
+    exportBtn->setPosition({ -45.f, -114.f });
     bottomMenu->addChild(exportBtn);
 
-    // Markers & Audio togglers
+    // Markers toggler
     auto togglerMarkers = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleMarkers), 0.55f
+        this, menu_selector(ShowcasePopup::onToggleMarkers), 0.60f
     );
     togglerMarkers->toggle(ClickShowcase::get().m_showMarkers);
-    togglerMarkers->setPosition({ 178.f, -100.f });
+    togglerMarkers->setPosition({ 45.f, -108.f });
     bottomMenu->addChild(togglerMarkers);
 
     auto lblMarkers = CCLabelBMFont::create("Markers", "goldFont.fnt");
-    lblMarkers->setScale(0.32f);
-    lblMarkers->setPosition({ winSize.width / 2.f + 178.f, winSize.height / 2.f - 117.f });
+    lblMarkers->setScale(0.35f);
+    lblMarkers->setPosition({ winSize.width / 2.f + 45.f, winSize.height / 2.f - 126.f });
     m_mainLayer->addChild(lblMarkers);
 
+    // Sounds toggler
     auto togglerAudio = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleAudio), 0.55f
+        this, menu_selector(ShowcasePopup::onToggleAudio), 0.60f
     );
     togglerAudio->toggle(ClickShowcase::get().m_playAudio);
-    togglerAudio->setPosition({ 205.f, -100.f });
+    togglerAudio->setPosition({ 125.f, -108.f });
     bottomMenu->addChild(togglerAudio);
 
     auto lblAudio = CCLabelBMFont::create("Sounds", "goldFont.fnt");
-    lblAudio->setScale(0.32f);
-    lblAudio->setPosition({ winSize.width / 2.f + 205.f, winSize.height / 2.f - 117.f });
+    lblAudio->setScale(0.35f);
+    lblAudio->setPosition({ winSize.width / 2.f + 125.f, winSize.height / 2.f - 126.f });
     m_mainLayer->addChild(lblAudio);
 
     this->setKeypadEnabled(true);
     this->setTouchEnabled(true);
 
-    refreshList();
+    refreshList(true);
 
     return true;
 }
@@ -227,7 +192,7 @@ CCNode* ShowcasePopup::createCellTemplate(int index) {
     // 1. Click text: #X Press or #X Rel
     auto clickText = CCLabelBMFont::create("#0 Press", "chatFont.fnt");
     clickText->setAnchorPoint({ 0.f, 0.5f });
-    clickText->setPosition({ 8.f, 18.f });
+    clickText->setPosition({ 12.f, 18.f });
     clickText->setScale(0.55f);
     clickText->setID("click-text"_spr);
     cell->addChild(clickText);
@@ -236,63 +201,52 @@ CCNode* ShowcasePopup::createCellTemplate(int index) {
     auto pSpr = ButtonSprite::create("1P");
     pSpr->setScale(0.38f);
     auto pBtn = CCMenuItemSpriteExtra::create(pSpr, this, menu_selector(ShowcasePopup::onRowTogglePlayer));
-    pBtn->setPosition({ 88.f, 18.f });
+    pBtn->setPosition({ 105.f, 18.f });
     pBtn->setID("p-btn"_spr);
     menu->addChild(pBtn);
 
     // 3. Percent text
     auto percentText = CCLabelBMFont::create("0.00%", "goldFont.fnt");
     percentText->setAnchorPoint({ 0.f, 0.5f });
-    percentText->setPosition({ 118.f, 18.f });
-    percentText->setScale(0.42f);
+    percentText->setPosition({ 145.f, 18.f });
+    percentText->setScale(0.45f);
     percentText->setID("percent-text"_spr);
     cell->addChild(percentText);
 
-    // 4. Draw marker checkbox (toggles None / Active)
-    auto drawToggle = CCMenuItemToggler::create(
-        CCSprite::createWithSpriteFrameName("GJ_checkOff_001.png"),
-        CCSprite::createWithSpriteFrameName("GJ_checkOn_001.png"),
-        this, menu_selector(ShowcasePopup::onRowToggleDraw)
-    );
-    drawToggle->setScale(0.55f);
-    drawToggle->setPosition({ 195.f, 18.f });
-    drawToggle->setID("draw-toggle"_spr);
-    menu->addChild(drawToggle);
-
-    // 5. Tier label
+    // 4. Tier label
     auto tierLabel = CCLabelBMFont::create("Tier:", "chatFont.fnt");
     tierLabel->setAnchorPoint({ 0.f, 0.5f });
-    tierLabel->setPosition({ 222.f, 18.f });
+    tierLabel->setPosition({ 225.f, 18.f });
     tierLabel->setScale(0.45f);
     cell->addChild(tierLabel);
 
-    // 6. Tier button (cycles A -> B -> C -> D -> E -> None -> A)
-    auto tierSpr = ButtonSprite::create("A", "bigFont.fnt", "GJ_button_01.png", 0.42f);
+    // 5. Tier button (cycles None -> A -> B -> C -> D -> E -> None)
+    auto tierSpr = ButtonSprite::create("None", "bigFont.fnt", "GJ_button_01.png", 0.45f);
     auto tierBtn = CCMenuItemSpriteExtra::create(tierSpr, this, menu_selector(ShowcasePopup::onRowTierClicked));
-    tierBtn->setPosition({ 275.f, 18.f });
+    tierBtn->setPosition({ 282.f, 18.f });
     tierBtn->setID("tier-btn"_spr);
     menu->addChild(tierBtn);
 
-    // 7. Frame label
+    // 6. Frame label
     auto frameText = CCLabelBMFont::create("F:0", "chatFont.fnt");
     frameText->setAnchorPoint({ 0.f, 0.5f });
-    frameText->setPosition({ 312.f, 18.f });
+    frameText->setPosition({ 325.f, 18.f });
     frameText->setScale(0.45f);
     frameText->setID("frame-text"_spr);
     cell->addChild(frameText);
 
-    // 8. Delete / Mute button
+    // 7. Delete / Mute button (sets tier to None)
     auto delSpr = CCSprite::createWithSpriteFrameName("GJ_deleteIcon_001.png");
     delSpr->setScale(0.55f);
     auto delBtn = CCMenuItemSpriteExtra::create(delSpr, this, menu_selector(ShowcasePopup::onRowDelete));
-    delBtn->setPosition({ 368.f, 18.f });
+    delBtn->setPosition({ 372.f, 18.f });
     delBtn->setID("del-btn"_spr);
     menu->addChild(delBtn);
 
     return cell;
 }
 
-void ShowcasePopup::refreshList() {
+void ShowcasePopup::refreshList(bool resetScroll) {
     auto& clicks = ClickShowcase::get().m_clicks;
     int totalItems = static_cast<int>(clicks.size());
     int totalPages = std::max(1, (totalItems + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
@@ -318,7 +272,7 @@ void ShowcasePopup::refreshList() {
     int displayCount = endIdx - startIdx;
 
     float rowHeight = 38.f;
-    float contentHeight = std::max(160.f, displayCount * rowHeight);
+    float contentHeight = std::max(175.f, displayCount * rowHeight);
     m_contentNode->setContentSize({ 400.f, contentHeight });
     m_scrollLayer->m_contentLayer->setContentSize({ 400.f, contentHeight });
 
@@ -346,7 +300,7 @@ void ShowcasePopup::refreshList() {
             if (auto clickText = static_cast<CCLabelBMFont*>(cell->getChildByID("click-text"_spr))) {
                 clickText->setString(fmt::format("#{} {}", click.clickIndex, click.isHold ? "Press" : "Rel").c_str());
                 if (!click.isHold) {
-                    clickText->setColor({ 200, 220, 255 }); // subtle cyan tint for releases
+                    clickText->setColor({ 180, 220, 255 }); // cyan tint for releases
                 } else {
                     clickText->setColor({ 255, 255, 255 });
                 }
@@ -360,12 +314,6 @@ void ShowcasePopup::refreshList() {
                     if (auto spr = typeinfo_cast<ButtonSprite*>(pBtn->getNormalImage())) {
                         spr->setString(click.isPlayer2 ? "2P" : "1P");
                     }
-                }
-
-                // Draw toggle (checked if not None)
-                if (auto drawToggle = static_cast<CCMenuItemToggler*>(menu->getChildByID("draw-toggle"_spr))) {
-                    drawToggle->setTag(click.clickIndex);
-                    drawToggle->toggle(click.tier != ClickTier::None);
                 }
 
                 // Tier button
@@ -405,13 +353,15 @@ void ShowcasePopup::refreshList() {
         }
     }
 
-    m_scrollLayer->moveToTop();
+    if (resetScroll) {
+        m_scrollLayer->moveToTop();
+    }
 }
 
 void ShowcasePopup::onPrevPage(CCObject*) {
     if (m_currentPage > 0) {
         m_currentPage--;
-        refreshList();
+        refreshList(true); // Reset scroll to top on page navigation
     }
 }
 
@@ -420,7 +370,7 @@ void ShowcasePopup::onNextPage(CCObject*) {
     int totalPages = std::max(1, (static_cast<int>(clicks.size()) + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE);
     if (m_currentPage + 1 < totalPages) {
         m_currentPage++;
-        refreshList();
+        refreshList(true); // Reset scroll to top on page navigation
     }
 }
 
@@ -430,18 +380,7 @@ void ShowcasePopup::onRowTierClicked(CCObject* sender) {
 
     int clickIndex = node->getTag();
     ClickShowcase::get().cycleClickTier(clickIndex);
-    refreshList();
-}
-
-void ShowcasePopup::onRowToggleDraw(CCObject* sender) {
-    auto toggle = typeinfo_cast<CCMenuItemToggler*>(sender);
-    if (!toggle) return;
-
-    int clickIndex = toggle->getTag();
-    bool isNowActive = !toggle->isToggled();
-
-    ClickShowcase::get().assignByClick(clickIndex, isNowActive ? ClickTier::C : ClickTier::None);
-    refreshList();
+    refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
 }
 
 void ShowcasePopup::onRowDelete(CCObject* sender) {
@@ -450,7 +389,7 @@ void ShowcasePopup::onRowDelete(CCObject* sender) {
 
     int clickIndex = node->getTag();
     ClickShowcase::get().assignByClick(clickIndex, ClickTier::None);
-    refreshList();
+    refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
 }
 
 void ShowcasePopup::onRowTogglePlayer(CCObject* sender) {
@@ -464,86 +403,7 @@ void ShowcasePopup::onRowTogglePlayer(CCObject* sender) {
             break;
         }
     }
-    refreshList();
-}
-
-void ShowcasePopup::onQuickSetRange(CCObject* sender) {
-    auto node = typeinfo_cast<CCNode*>(sender);
-    if (!node) return;
-
-    char tierChar = static_cast<char>(node->getTag());
-    ClickTier tier = static_cast<ClickTier>(tierChar);
-
-    if (!m_rangeInput) return;
-    std::string text = m_rangeInput->getString();
-    // Trim whitespace
-    text.erase(0, text.find_first_not_of(" \t\r\n"));
-    text.erase(text.find_last_not_of(" \t\r\n") + 1);
-
-    if (text.empty()) {
-        auto alert = FLAlertLayer::create(
-            "Quick Assign",
-            "Type a Click # (e.g. <cr>4</c> or <cr>1-10</c>) or % (e.g. <cg>3.61%</c> or <cg>10-25%</c>)",
-            "OK"
-        );
-        alert->show();
-        return;
-    }
-
-    bool isPercent = (text.find('%') != std::string::npos);
-    std::string clean = text;
-    clean.erase(std::remove(clean.begin(), clean.end(), '%'), clean.end());
-    clean.erase(std::remove(clean.begin(), clean.end(), '#'), clean.end());
-
-    auto dashPos = clean.find('-');
-    if (dashPos != std::string::npos) {
-        try {
-            float val1 = std::stof(clean.substr(0, dashPos));
-            float val2 = std::stof(clean.substr(dashPos + 1));
-            float minVal = std::min(val1, val2);
-            float maxVal = std::max(val1, val2);
-
-            if (isPercent || (minVal < 1.0f && maxVal <= 100.0f && clean.find('.') != std::string::npos)) {
-                int affected = ClickShowcase::get().assignByPercentRange(minVal, maxVal, tier);
-                geode::Notification::create(
-                    fmt::format("Assigned {} clicks in {:.1f}%-{:.1f}% to {}!", affected, minVal, maxVal, tierChar),
-                    geode::NotificationIcon::Success
-                )->show();
-            } else {
-                int minC = static_cast<int>(minVal);
-                int maxC = static_cast<int>(maxVal);
-                int affected = 0;
-                for (int c = minC; c <= maxC; c++) {
-                    if (ClickShowcase::get().assignByClick(c, tier)) affected++;
-                }
-                geode::Notification::create(
-                    fmt::format("Assigned {} clicks (#{}-#{}) to {}!", affected, minC, maxC, tierChar),
-                    geode::NotificationIcon::Success
-                )->show();
-            }
-        } catch (...) {}
-    } else {
-        try {
-            if (isPercent || (clean.find('.') != std::string::npos)) {
-                float p = std::stof(clean);
-                ClickShowcase::get().assignByPercent(p, tier);
-                geode::Notification::create(
-                    fmt::format("Assigned click at {:.2f}% to {}!", p, tierChar),
-                    geode::NotificationIcon::Success
-                )->show();
-            } else {
-                int c = std::stoi(clean);
-                ClickShowcase::get().assignByClick(c, tier);
-                geode::Notification::create(
-                    fmt::format("Assigned Click #{} to {}!", c, tierChar),
-                    geode::NotificationIcon::Success
-                )->show();
-                m_currentPage = std::max(0, (c - 1) / ITEMS_PER_PAGE);
-            }
-        } catch (...) {}
-    }
-
-    refreshList();
+    refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
 }
 
 void ShowcasePopup::onClose(CCObject*) {
@@ -586,7 +446,7 @@ void ShowcasePopup::onImport(CCObject*) {
             alert->show();
 
             m_currentPage = 0;
-            this->refreshList();
+            this->refreshList(true);
         }
     });
 }

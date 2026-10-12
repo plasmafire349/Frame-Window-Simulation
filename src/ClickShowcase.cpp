@@ -7,6 +7,7 @@
 using namespace geode::prelude;
 
 void ClickShowcase::reset() {
+    m_currentFrame = 0;
     m_lastTriggeredFrame = -1;
     m_currentClicksHit = 0;
     m_tierCounts.clear();
@@ -193,21 +194,17 @@ cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
     return markerNode;
 }
 
-void ClickShowcase::onPhysicsStep(PlayLayer* layer) {
+void ClickShowcase::stepPhysicsFrame(PlayLayer* layer) {
     if (!layer || m_clicks.empty()) return;
     if (layer->m_isPaused) return;
 
     auto player = layer->m_player1;
     if (!player || player->m_isDead) return;
 
-    int currentFrame = static_cast<int>(layer->m_gameState.m_currentProgress * (m_fps / 60.0f));
-    if (currentFrame <= 0) {
-        float progress = layer->m_player1->getPositionX() / std::max(1.0f, layer->m_levelLength);
-        currentFrame = static_cast<int>(progress * (m_clicks.back().frame));
-    }
+    m_currentFrame++;
 
     for (auto& click : m_clicks) {
-        if (!click.hasTriggered && currentFrame >= click.frame) {
+        if (!click.hasTriggered && m_currentFrame >= click.frame) {
             click.hasTriggered = true;
             m_currentClicksHit = click.clickIndex;
             if (click.tier != ClickTier::None) {
@@ -246,6 +243,13 @@ void ClickShowcase::onPhysicsStep(PlayLayer* layer) {
                 }
             }
         }
+    }
+}
+
+void ClickShowcase::onPhysicsStep(PlayLayer* layer) {
+    // Fallback if not hooked via PlayerObject
+    if (m_currentFrame == 0 && layer && layer->m_player1) {
+        stepPhysicsFrame(layer);
     }
 }
 

@@ -19,6 +19,7 @@ public:
 
     std::vector<ClickMarkerInfo> m_clicks;
     float m_fps = 240.0f;
+    int m_currentFrame = 0;
     int m_lastTriggeredFrame = -1;
 
     // Manual tier assignments: clickIndex -> tier
@@ -45,6 +46,7 @@ public:
     int getTierAssignedCount(ClickTier tier) const;
     int getTierHitCount(ClickTier tier) const;
 
+    void stepPhysicsFrame(PlayLayer* layer);
     void onPhysicsStep(PlayLayer* layer);
     void onPlayerDeath();
 
