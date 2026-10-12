@@ -253,7 +253,7 @@ void ClickShowcase::exportClicksJson(const std::filesystem::path& path) {
 
     std::ofstream f(path);
     if (f) {
-        f << root.dump(matjson::TWO_SPACES);
+        f << root.dump(matjson::NO_INDENTATION);
         f.close();
         geode::Notification::create("Exported Clicks to JSON!", geode::NotificationIcon::Success)->show();
     }

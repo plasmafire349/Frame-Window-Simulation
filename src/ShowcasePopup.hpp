@@ -4,7 +4,7 @@
 class ShowcasePopup : public FLAlertLayer {
 protected:
     CCTextInputNode* m_inputField = nullptr;
-    CCLabelBMFont* m_infoLabel = nullptr;
+    cocos2d::CCLabelBMFont* m_infoLabel = nullptr;
 
     bool init() override;
 
