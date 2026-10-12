@@ -30,6 +30,8 @@ protected:
 
     void onImport(cocos2d::CCObject*);
     void onExport(cocos2d::CCObject*);
+    void onPreview(cocos2d::CCObject*);
+    void startPlaybackPreview(const std::string& filename);
     void onToggleRecord(cocos2d::CCObject*);
     void onOpenRecordingsFolder(cocos2d::CCObject*);
     void onToggleMarkers(cocos2d::CCObject*);

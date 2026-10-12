@@ -22,6 +22,10 @@ using namespace geode::prelude;
 #include <config.hpp>
 
 inline bool isBotRunning() {
+    if (ClickShowcase::get().m_isPreviewing) {
+        return true;
+    }
+
     if (!ClickShowcase::get().m_botOnly) {
         return true;
     }
@@ -77,6 +81,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         // Recording indicator and hotkey
         Ref<CCNode> m_recIndicator = nullptr;
         bool m_recComboPrev = false;
+        bool m_keyPPrev = false;
     };
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
@@ -102,6 +107,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         m_fields->m_key5Prev = false;
         m_fields->m_key0Prev = false;
         m_fields->m_recComboPrev = false;
+        m_fields->m_keyPPrev = false;
         m_fields->m_recIndicator = nullptr;
 
         ClickShowcase::get().reset();
@@ -591,6 +597,18 @@ class $modify(MyPlayLayer, PlayLayer) {
                         }
                         m_fields->m_recComboPrev = recCombo;
 
+                        bool isP = (GetAsyncKeyState('P') & 0x8000) != 0;
+                        bool previewCombo = isCtrl && isP && !isShift;
+                        if (previewCombo && !m_fields->m_keyPPrev) {
+                            bool nextPreview = !ClickShowcase::get().m_isPreviewing;
+                            ClickShowcase::get().m_isPreviewing = nextPreview;
+                            Notification::create(
+                                nextPreview ? "Preview Mode ON" : "Preview Mode OFF",
+                                NotificationIcon::Info
+                            )->show();
+                        }
+                        m_fields->m_keyPPrev = previewCombo;
+
                         if (!isCtrl && !isShift) {
                             bool k1 = (GetAsyncKeyState('1') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) != 0;
                             bool k2 = (GetAsyncKeyState('2') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) != 0;
@@ -630,6 +648,22 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         m_fields->m_currentFrame++;
         int currentFrame = m_fields->m_currentFrame;
+
+        // If preview mode is active, simulate player inputs hands-free
+        if (ClickShowcase::get().m_isPreviewing) {
+            for (const auto& click : ClickShowcase::get().m_clicks) {
+                if (click.frame == currentFrame) {
+                    auto player = (click.isPlayer2 && this->m_player2) ? this->m_player2 : this->m_player1;
+                    if (player) {
+                        if (click.isHold) {
+                            player->pushButton(PlayerButton::Jump);
+                        } else {
+                            player->releaseButton(PlayerButton::Jump);
+                        }
+                    }
+                }
+            }
+        }
 
         // Auto-capture exact positions and percents for clicks matching currentFrame
         for (auto& click : ClickShowcase::get().m_clicks) {
@@ -823,6 +857,7 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 
     void onQuit() {
+        ClickShowcase::get().m_isPreviewing = false;
         this->unschedule(schedule_selector(MyPlayLayer::onMyTick));
         PlayLayer::onQuit();
     }
@@ -860,6 +895,7 @@ class $modify(MyPlayerObject, PlayerObject) {
 class $modify(MyPauseLayer, PauseLayer) {
     void customSetup() {
         PauseLayer::customSetup();
+        ClickShowcase::get().m_isPreviewing = false;
 
         auto rightMenu = this->getChildByID("right-button-menu");
         if (rightMenu) {

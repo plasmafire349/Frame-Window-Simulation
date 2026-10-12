@@ -316,6 +316,45 @@ std::filesystem::path ClickShowcase::getRecordingsDir() {
     return path;
 }
 
+std::filesystem::path ClickShowcase::getLatestRecordingFile(const std::string& levelName) {
+    auto dir = getRecordingsDir();
+    if (!std::filesystem::exists(dir)) return {};
+
+    std::string safeName = levelName.empty() ? "level" : levelName;
+    for (char& c : safeName) {
+        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
+            c = '_';
+        }
+    }
+
+    // 1. Check for showcase_{levelName}.json
+    auto showcaseFile = dir / fmt::format("showcase_{}.json", safeName);
+    if (std::filesystem::exists(showcaseFile)) {
+        return showcaseFile;
+    }
+
+    // 2. Look for the most recently modified file in fwc_recordings
+    std::filesystem::path bestPath;
+    std::filesystem::file_time_type bestTime{};
+
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
+        if (entry.is_regular_file()) {
+            auto ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            if (ext == ".json" || ext == ".gdr2" || ext == ".gdr") {
+                auto time = entry.last_write_time(ec);
+                if (bestPath.empty() || time > bestTime) {
+                    bestTime = time;
+                    bestPath = entry.path();
+                }
+            }
+        }
+    }
+
+    return bestPath;
+}
+
 std::string ClickShowcase::saveCurrentRecording(const std::string& levelName) {
     if (m_recordedClicks.empty()) return "";
 

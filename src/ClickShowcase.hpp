@@ -35,11 +35,13 @@ public:
     int m_lastActionIndex = 0;
     std::map<ClickTier, int> m_tierCounts;
 
-    // Live Recording
+    // Live Recording & Preview
     bool m_isRecording = false;
+    bool m_isPreviewing = false;
     std::vector<ClickMarkerInfo> m_recordedClicks;
 
     std::filesystem::path getRecordingsDir();
+    std::filesystem::path getLatestRecordingFile(const std::string& levelName);
     std::string saveCurrentRecording(const std::string& levelName);
 
     void loadReplayFile(const std::filesystem::path& path, float levelLength);

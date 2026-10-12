@@ -198,32 +198,40 @@ bool ShowcasePopup::init() {
     m_mainLayer->addChild(bottomMenu);
 
     // Import button
-    auto importSpr = ButtonSprite::create("Import", "goldFont.fnt", "GJ_button_01.png", 0.65f);
+    auto importSpr = ButtonSprite::create("Import", "goldFont.fnt", "GJ_button_01.png", 0.58f);
     auto importBtn = CCMenuItemSpriteExtra::create(
         importSpr, this, menu_selector(ShowcasePopup::onImport)
     );
-    importBtn->setPosition({ -145.f, -114.f });
+    importBtn->setPosition({ -160.f, -114.f });
     bottomMenu->addChild(importBtn);
 
     // Export button
-    auto exportSpr = ButtonSprite::create("Export", "goldFont.fnt", "GJ_button_01.png", 0.65f);
+    auto exportSpr = ButtonSprite::create("Export", "goldFont.fnt", "GJ_button_01.png", 0.58f);
     auto exportBtn = CCMenuItemSpriteExtra::create(
         exportSpr, this, menu_selector(ShowcasePopup::onExport)
     );
-    exportBtn->setPosition({ -75.f, -114.f });
+    exportBtn->setPosition({ -105.f, -114.f });
     bottomMenu->addChild(exportBtn);
+
+    // Preview button
+    auto previewSpr = ButtonSprite::create("Preview", "goldFont.fnt", "GJ_button_02.png", 0.58f);
+    auto previewBtn = CCMenuItemSpriteExtra::create(
+        previewSpr, this, menu_selector(ShowcasePopup::onPreview)
+    );
+    previewBtn->setPosition({ -45.f, -114.f });
+    bottomMenu->addChild(previewBtn);
 
     // Markers toggler
     auto togglerMarkers = CCMenuItemToggler::createWithStandardSprites(
         this, menu_selector(ShowcasePopup::onToggleMarkers), 0.55f
     );
     togglerMarkers->toggle(ClickShowcase::get().m_showMarkers);
-    togglerMarkers->setPosition({ -5.f, -108.f });
+    togglerMarkers->setPosition({ 15.f, -108.f });
     bottomMenu->addChild(togglerMarkers);
 
     auto lblMarkers = CCLabelBMFont::create("Markers", "goldFont.fnt");
     lblMarkers->setScale(0.32f);
-    lblMarkers->setPosition({ winSize.width / 2.f - 5.f, winSize.height / 2.f - 126.f });
+    lblMarkers->setPosition({ winSize.width / 2.f + 15.f, winSize.height / 2.f - 126.f });
     m_mainLayer->addChild(lblMarkers);
 
     // Sounds toggler
@@ -231,12 +239,12 @@ bool ShowcasePopup::init() {
         this, menu_selector(ShowcasePopup::onToggleAudio), 0.55f
     );
     togglerAudio->toggle(ClickShowcase::get().m_playAudio);
-    togglerAudio->setPosition({ 65.f, -108.f });
+    togglerAudio->setPosition({ 75.f, -108.f });
     bottomMenu->addChild(togglerAudio);
 
     auto lblAudio = CCLabelBMFont::create("Sounds", "goldFont.fnt");
     lblAudio->setScale(0.32f);
-    lblAudio->setPosition({ winSize.width / 2.f + 65.f, winSize.height / 2.f - 126.f });
+    lblAudio->setPosition({ winSize.width / 2.f + 75.f, winSize.height / 2.f - 126.f });
     m_mainLayer->addChild(lblAudio);
 
     // Bot Only toggler
@@ -725,4 +733,64 @@ void ShowcasePopup::onOpenRecordingsFolder(CCObject*) {
     file::openFolder(dir);
 #endif
     Notification::create("Opened fwc_recordings folder", NotificationIcon::Info)->show();
+}
+
+void ShowcasePopup::onPreview(CCObject*) {
+    std::string levelName = "level";
+    if (auto pl = PlayLayer::get()) {
+        if (pl->m_level) {
+            levelName = pl->m_level->m_levelName;
+        }
+    }
+
+    auto filePath = ClickShowcase::get().getLatestRecordingFile(levelName);
+    if (filePath.empty() || !std::filesystem::exists(filePath)) {
+        FLAlertLayer::create(
+            "No Recording Found",
+            "No recording or showcase file found in <cg>fwc_recordings/</c>!\nPress <cy>Ctrl+Shift+J</c> to record a run first.",
+            "OK"
+        )->show();
+        return;
+    }
+
+    this->startPlaybackPreview(filePath.string());
+}
+
+void ShowcasePopup::startPlaybackPreview(const std::string& filename) {
+    std::filesystem::path path(filename);
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+    if (ext == ".json") {
+        ClickShowcase::get().loadClicksJson(path);
+    } else {
+        float levelLen = 10000.f;
+        if (auto pl = PlayLayer::get()) {
+            levelLen = pl->m_levelLength;
+        }
+        ClickShowcase::get().loadReplayFile(path, levelLen);
+    }
+
+    if (ClickShowcase::get().m_clicks.empty()) {
+        FLAlertLayer::create("Empty File", "The recording file contains no click inputs!", "OK")->show();
+        return;
+    }
+
+    ClickShowcase::get().m_isPreviewing = true;
+    ClickShowcase::get().reset();
+
+    triggerPlayLayerHUDUpdate();
+
+    this->removeFromParentAndCleanup(true);
+
+    if (auto pl = PlayLayer::get()) {
+        pl->resetLevel();
+        if (auto pauseLayer = CCScene::get()->getChildByType<PauseLayer>(0)) {
+            pauseLayer->onResume(nullptr);
+        }
+        Notification::create(
+            fmt::format("Previewing: {}", path.filename().string()),
+            NotificationIcon::Success
+        )->show();
+    }
 }
