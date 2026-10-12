@@ -121,15 +121,7 @@ void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float leve
     if (totalFrames <= 0) totalFrames = 1;
 
     // Calculate percent by level time
-    float totalDuration = m_duration;
-    if (totalDuration <= 0.0f) {
-        if (auto pl = PlayLayer::get()) {
-            totalDuration = pl->timeForXPos(pl->m_levelLength);
-        }
-    }
-    if (totalDuration <= 0.0f) {
-        totalDuration = static_cast<float>(totalFrames) / m_fps;
-    }
+    float totalDuration = (m_duration > 0.0f) ? m_duration : (static_cast<float>(totalFrames) / m_fps);
     if (totalDuration <= 0.0f) totalDuration = 1.0f;
     m_duration = totalDuration;
 

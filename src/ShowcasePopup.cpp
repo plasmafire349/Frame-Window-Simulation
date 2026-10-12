@@ -509,8 +509,8 @@ void ShowcasePopup::onQuickAssignCurrent(CCObject* sender) {
     CCPoint playerPos = pl->m_player1->getPosition();
     int currFrame = getCurrentPhysicsFrame();
     float totalDur = ClickShowcase::get().m_duration;
-    if (totalDur <= 0.0f && pl->m_levelLength > 0.f) {
-        totalDur = pl->timeForXPos(pl->m_levelLength);
+    if (totalDur <= 0.0f && !ClickShowcase::get().m_clicks.empty()) {
+        totalDur = static_cast<float>(ClickShowcase::get().m_clicks.back().frame) / ClickShowcase::get().m_fps;
     }
     float currPercent = (totalDur > 0.0f)
         ? std::clamp(((static_cast<float>(currFrame) / ClickShowcase::get().m_fps) / totalDur) * 100.0f, 0.0f, 100.0f)
