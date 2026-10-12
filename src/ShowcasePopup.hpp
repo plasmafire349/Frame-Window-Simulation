@@ -23,6 +23,7 @@ protected:
     void onRowTierClicked(cocos2d::CCObject* sender);
     void onRowDelete(cocos2d::CCObject* sender);
     void onRowTogglePlayer(cocos2d::CCObject* sender);
+    void onQuickAssignCurrent(cocos2d::CCObject* sender);
 
     void onImport(cocos2d::CCObject*);
     void onExport(cocos2d::CCObject*);
@@ -34,4 +35,7 @@ public:
     static ShowcasePopup* create();
 };
 
+int getCurrentPhysicsFrame();
 void triggerPlayLayerHUDUpdate();
+void spawnMarkerInPlayLayer(cocos2d::CCPoint pos, const std::string& displayStr, cocos2d::ccColor4F color, int clickIndex = 0);
+void removeMarkerInPlayLayer(int clickIndex);

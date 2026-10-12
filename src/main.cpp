@@ -16,6 +16,7 @@ using namespace geode::prelude;
 struct ActiveMarker {
     Ref<CCNode> node;
     CCPoint worldPos;
+    int clickIndex = 0;
 };
 
 inline int getTierId(ClickTier tier) {
@@ -199,7 +200,22 @@ class $modify(MyPlayLayer, PlayLayer) {
         countLbl->runAction(tintSeq);
     }
 
-    void spawnFrameWindowMarker(CCPoint pos, const std::string& displayStr, ccColor4F color) {
+    void removeMarkerByClickIndex(int clickIndex) {
+        for (auto it = m_fields->m_activeMarkers.begin(); it != m_fields->m_activeMarkers.end(); ) {
+            if (it->clickIndex == clickIndex) {
+                if (it->node) it->node->removeFromParent();
+                it = m_fields->m_activeMarkers.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    void spawnFrameWindowMarker(CCPoint pos, const std::string& displayStr, ccColor4F color, int clickIndex = 0) {
+        if (clickIndex > 0) {
+            this->removeMarkerByClickIndex(clickIndex);
+        }
+
         auto markerNode = CCNode::create();
         markerNode->setID("frame-window-marker"_spr);
 
@@ -218,6 +234,18 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 4.f, { 0.f, 0.f, 0.f, color.a });
         circle->drawPolygon(verts, 64, { 0.f, 0.f, 0.f, 0.f }, 2.f, { r, g, b, a });
+
+        // If release action: add center dot for clear visual distinction matching FWC
+        if (displayStr.find("Rel") != std::string::npos) {
+            CCPoint innerVerts[32];
+            float innerRadius = 4.0f;
+            for (int i = 0; i < 32; i++) {
+                float angle = i * (3.14159f * 2.0f) / 32.0f;
+                innerVerts[i] = CCPoint{ innerRadius * cosf(angle), innerRadius * sinf(angle) };
+            }
+            circle->drawPolygon(innerVerts, 32, { r, g, b, a }, 1.0f, { r, g, b, a });
+        }
+
         markerNode->addChild(circle, 0);
 
         auto label = CCLabelBMFont::create(displayStr.c_str(), "bigFont.fnt");
@@ -245,7 +273,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             markerNode->setPosition(pos);
         }
 
-        m_fields->m_activeMarkers.push_back({ markerNode, pos });
+        m_fields->m_activeMarkers.push_back({ markerNode, pos, clickIndex });
     }
 
     void updateAndCleanMarkers() {
@@ -260,6 +288,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         float minY = -margin;
         float maxY = winSize.height + margin;
 
+        // 1. Update positions of existing markers and cull offscreen
         for (auto it = m_fields->m_activeMarkers.begin(); it != m_fields->m_activeMarkers.end(); ) {
             auto& marker = *it;
             if (!marker.node || !marker.node->getParent()) {
@@ -278,6 +307,36 @@ class $modify(MyPlayLayer, PlayLayer) {
                 ++it;
             }
         }
+
+        // 2. Pre-spawn markers for assigned clicks that are on-screen
+        if (ClickShowcase::get().m_showMarkers) {
+            for (const auto& click : ClickShowcase::get().m_clicks) {
+                if (click.tier == ClickTier::None) continue;
+                if (click.position.x == 0.f && click.position.y == 0.f) continue;
+
+                bool alreadyActive = false;
+                for (const auto& am : m_fields->m_activeMarkers) {
+                    if (am.clickIndex == click.clickIndex) {
+                        alreadyActive = true;
+                        break;
+                    }
+                }
+                if (alreadyActive) continue;
+
+                CCPoint screenPos = this->m_objectLayer->convertToWorldSpace(click.position);
+                if (screenPos.x >= minX && screenPos.x <= maxX && screenPos.y >= minY && screenPos.y <= maxY) {
+                    std::string markerText = click.isHold 
+                        ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent)
+                        : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent);
+                    this->spawnFrameWindowMarker(click.position, markerText, getTierColor(click.tier), click.clickIndex);
+                }
+            }
+        }
+    }
+
+    void postUpdate(float dt) {
+        PlayLayer::postUpdate(dt);
+        this->updateAndCleanMarkers();
     }
 
     void onMyTick(float dt) {
@@ -307,6 +366,17 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         m_fields->m_currentFrame++;
         int currentFrame = m_fields->m_currentFrame;
+
+        // Auto-capture exact positions and percents for clicks matching currentFrame
+        for (auto& click : ClickShowcase::get().m_clicks) {
+            if (click.frame == currentFrame) {
+                CCPoint playerPos = (click.isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
+                click.position = playerPos;
+                if (this->m_levelLength > 0.f) {
+                    click.percent = std::clamp((playerPos.x / this->m_levelLength) * 100.0f, 0.0f, 100.0f);
+                }
+            }
+        }
 
         // Reset if rewinding or restarting
         if (currentFrame < m_fields->m_lastFrame) {
@@ -348,19 +418,24 @@ class $modify(MyPlayLayer, PlayLayer) {
                         updatedTiers.push_back(tid);
                         updatedTiers.push_back(0);
 
-                        // 1. Spawn marker at player position
-                        if (ClickShowcase::get().m_showMarkers) {
-                            CCPoint spawnPos = this->m_player1->getPosition();
-                            if (click.isPlayer2 && this->m_player2) {
-                                spawnPos = this->m_player2->getPosition();
+                        // 1. Ensure position is set
+                        if (click.position.x == 0.f && click.position.y == 0.f) {
+                            CCPoint pPos = (click.isPlayer2 && this->m_player2) ? this->m_player2->getPosition() : this->m_player1->getPosition();
+                            click.position = pPos;
+                            if (this->m_levelLength > 0.f) {
+                                click.percent = std::clamp((pPos.x / this->m_levelLength) * 100.0f, 0.0f, 100.0f);
                             }
+                        }
+
+                        // 2. Spawn marker at player position
+                        if (ClickShowcase::get().m_showMarkers) {
                             std::string markerText = click.isHold 
                                 ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent)
                                 : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(click.tier), click.clickIndex, click.percent);
-                            this->spawnFrameWindowMarker(spawnPos, markerText, getTierColor(click.tier));
+                            this->spawnFrameWindowMarker(click.position, markerText, getTierColor(click.tier), click.clickIndex);
                         }
 
-                        // 2. Play sound
+                        // 3. Play sound
                         if (!skipAudio && ClickShowcase::get().m_playAudio) {
                             std::string sfx = getTierSound(click.tier);
                             if (!sfx.empty()) {
@@ -530,8 +605,28 @@ class $modify(MyPauseLayer, PauseLayer) {
     }
 };
 
+int getCurrentPhysicsFrame() {
+    if (auto pl = PlayLayer::get()) {
+        return static_cast<MyPlayLayer*>(pl)->m_fields->m_currentFrame;
+    }
+    return 0;
+}
+
 void triggerPlayLayerHUDUpdate() {
     if (auto pl = PlayLayer::get()) {
         static_cast<MyPlayLayer*>(pl)->rebuildHUD();
+        static_cast<MyPlayLayer*>(pl)->updateAndCleanMarkers();
+    }
+}
+
+void spawnMarkerInPlayLayer(CCPoint pos, const std::string& displayStr, ccColor4F color, int clickIndex) {
+    if (auto pl = PlayLayer::get()) {
+        static_cast<MyPlayLayer*>(pl)->spawnFrameWindowMarker(pos, displayStr, color, clickIndex);
+    }
+}
+
+void removeMarkerInPlayLayer(int clickIndex) {
+    if (auto pl = PlayLayer::get()) {
+        static_cast<MyPlayLayer*>(pl)->removeMarkerByClickIndex(clickIndex);
     }
 }

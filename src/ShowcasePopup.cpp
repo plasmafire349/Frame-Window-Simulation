@@ -80,28 +80,66 @@ bool ShowcasePopup::init() {
     closeBtn->setPosition({ 200.f, 126.f });
     topMenu->addChild(closeBtn);
 
-    // ── Page Navigation Bar (y = +96.f) ──────────────────────────────────────
+    // ── Page Navigation Bar (y = +100.f) ──────────────────────────────────────
     auto prevSpr = ButtonSprite::create("<", "bigFont.fnt", "GJ_button_01.png", 0.55f);
     m_prevBtn = CCMenuItemSpriteExtra::create(
         prevSpr, this, menu_selector(ShowcasePopup::onPrevPage)
     );
-    m_prevBtn->setPosition({ -140.f, 96.f });
+    m_prevBtn->setPosition({ -140.f, 100.f });
     topMenu->addChild(m_prevBtn);
 
     m_pageLabel = CCLabelBMFont::create("Page 1 / 1 (0 inputs)", "bigFont.fnt");
     m_pageLabel->setScale(0.42f);
-    m_pageLabel->setPosition({ winSize.width / 2.f, winSize.height / 2.f + 96.f });
+    m_pageLabel->setPosition({ winSize.width / 2.f, winSize.height / 2.f + 100.f });
     m_mainLayer->addChild(m_pageLabel);
 
     auto nextSpr = ButtonSprite::create(">", "bigFont.fnt", "GJ_button_01.png", 0.55f);
     m_nextBtn = CCMenuItemSpriteExtra::create(
         nextSpr, this, menu_selector(ShowcasePopup::onNextPage)
     );
-    m_nextBtn->setPosition({ 140.f, 96.f });
+    m_nextBtn->setPosition({ 140.f, 100.f });
     topMenu->addChild(m_nextBtn);
 
-    // ── ScrollLayer Table (400 x 175) ────────────────────────────────────────
-    m_scrollLayer = ScrollLayer::create({ 400.f, 175.f });
+    // ── Quick Assign Bar: Assign Here: [A] [B] [C] [D] [E] [None] (y = +74.f) ──
+    auto assignLabel = CCLabelBMFont::create("Assign Here:", "goldFont.fnt");
+    assignLabel->setScale(0.40f);
+    assignLabel->setPosition({ winSize.width / 2.f - 140.f, winSize.height / 2.f + 74.f });
+    m_mainLayer->addChild(assignLabel);
+
+    auto assignMenu = CCMenu::create();
+    assignMenu->setPosition(winSize / 2.f);
+    m_mainLayer->addChild(assignMenu);
+
+    struct QuickTier {
+        const char* label;
+        ClickTier tier;
+        float xOffset;
+        ccColor4F color;
+    };
+    QuickTier quickTiers[] = {
+        { "A", ClickTier::A, -70.f, getTierColor(ClickTier::A) },
+        { "B", ClickTier::B, -32.f, getTierColor(ClickTier::B) },
+        { "C", ClickTier::C,   6.f, getTierColor(ClickTier::C) },
+        { "D", ClickTier::D,  44.f, getTierColor(ClickTier::D) },
+        { "E", ClickTier::E,  82.f, getTierColor(ClickTier::E) },
+        { "None", ClickTier::None, 135.f, getTierColor(ClickTier::None) }
+    };
+
+    for (const auto& qt : quickTiers) {
+        auto btnSpr = ButtonSprite::create(qt.label, "bigFont.fnt", "GJ_button_01.png", 0.40f);
+        btnSpr->setColor({
+            static_cast<GLubyte>(qt.color.r * 255),
+            static_cast<GLubyte>(qt.color.g * 255),
+            static_cast<GLubyte>(qt.color.b * 255)
+        });
+        auto btn = CCMenuItemSpriteExtra::create(btnSpr, this, menu_selector(ShowcasePopup::onQuickAssignCurrent));
+        btn->setTag(static_cast<int>(qt.tier));
+        btn->setPosition({ qt.xOffset, 74.f });
+        assignMenu->addChild(btn);
+    }
+
+    // ── ScrollLayer Table (400 x 148) ────────────────────────────────────────
+    m_scrollLayer = ScrollLayer::create({ 400.f, 148.f });
     m_scrollLayer->setPosition({ winSize.width / 2.f - 200.f, winSize.height / 2.f - 88.f });
     m_mainLayer->addChild(m_scrollLayer);
 
@@ -165,6 +203,24 @@ bool ShowcasePopup::init() {
 
     this->setKeypadEnabled(true);
     this->setTouchEnabled(true);
+
+    // Auto-navigate to page closest to current player position
+    if (auto pl = PlayLayer::get()) {
+        int currFrame = getCurrentPhysicsFrame();
+        auto& clicks = ClickShowcase::get().m_clicks;
+        int closestIdx = 0;
+        int minDiff = 999999;
+        for (size_t i = 0; i < clicks.size(); i++) {
+            int diff = std::abs(clicks[i].frame - currFrame);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = static_cast<int>(i);
+            }
+        }
+        if (!clicks.empty() && minDiff < 999999) {
+            m_currentPage = closestIdx / ITEMS_PER_PAGE;
+        }
+    }
 
     refreshList(true);
 
@@ -379,7 +435,37 @@ void ShowcasePopup::onRowTierClicked(CCObject* sender) {
     if (!node) return;
 
     int clickIndex = node->getTag();
-    ClickShowcase::get().cycleClickTier(clickIndex);
+    ClickTier newTier = ClickShowcase::get().cycleClickTier(clickIndex);
+
+    if (auto pl = PlayLayer::get()) {
+        for (auto& c : ClickShowcase::get().m_clicks) {
+            if (c.clickIndex == clickIndex) {
+                // If position is not set yet, or if player is currently near this click
+                if (c.position.x == 0.f && c.position.y == 0.f) {
+                    if (pl->m_player1) {
+                        int currFrame = getCurrentPhysicsFrame();
+                        if (std::abs(currFrame - c.frame) <= 120) {
+                            c.position = pl->m_player1->getPosition();
+                        } else if (pl->m_levelLength > 0.f) {
+                            c.position.x = (c.percent / 100.0f) * pl->m_levelLength;
+                            c.position.y = pl->m_player1->getPositionY();
+                        }
+                    }
+                }
+
+                if (c.tier != ClickTier::None && (c.position.x != 0.f || c.position.y != 0.f)) {
+                    std::string markerText = c.isHold
+                        ? fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(c.tier), c.clickIndex, c.percent)
+                        : fmt::format("{} #{} Rel ({:.1f}%)", static_cast<char>(c.tier), c.clickIndex, c.percent);
+                    spawnMarkerInPlayLayer(c.position, markerText, getTierColor(c.tier), c.clickIndex);
+                } else if (c.tier == ClickTier::None) {
+                    removeMarkerInPlayLayer(c.clickIndex);
+                }
+                break;
+            }
+        }
+    }
+
     refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
     triggerPlayLayerHUDUpdate();
 }
@@ -390,8 +476,91 @@ void ShowcasePopup::onRowDelete(CCObject* sender) {
 
     int clickIndex = node->getTag();
     ClickShowcase::get().assignByClick(clickIndex, ClickTier::None);
+    removeMarkerInPlayLayer(clickIndex);
     refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
     triggerPlayLayerHUDUpdate();
+}
+
+void ShowcasePopup::onQuickAssignCurrent(CCObject* sender) {
+    auto pl = PlayLayer::get();
+    if (!pl || !pl->m_player1) {
+        FLAlertLayer::create("Info", "Enter a level and pause to assign your current position!", "OK")->show();
+        return;
+    }
+
+    auto btn = typeinfo_cast<CCNode*>(sender);
+    if (!btn) return;
+
+    ClickTier targetTier = static_cast<ClickTier>(btn->getTag());
+    CCPoint playerPos = pl->m_player1->getPosition();
+    int currFrame = getCurrentPhysicsFrame();
+    float currPercent = (pl->m_levelLength > 0.f)
+        ? std::clamp((playerPos.x / pl->m_levelLength) * 100.0f, 0.0f, 100.0f)
+        : pl->getCurrentPercent();
+
+    auto& clicks = ClickShowcase::get().m_clicks;
+    ClickMarkerInfo* match = nullptr;
+    int bestDiff = 999999;
+    for (auto& c : clicks) {
+        int diff = std::abs(c.frame - currFrame);
+        if (diff < bestDiff && diff <= 30) {
+            bestDiff = diff;
+            match = &c;
+        }
+    }
+
+    if (match) {
+        match->tier = targetTier;
+        match->position = playerPos;
+        match->percent = currPercent;
+        ClickShowcase::get().m_manualClickTiers[match->clickIndex] = targetTier;
+    } else {
+        ClickMarkerInfo newClick;
+        newClick.frame = currFrame;
+        newClick.percent = currPercent;
+        newClick.position = playerPos;
+        newClick.tier = targetTier;
+        newClick.isHold = true;
+        newClick.isPlayer2 = false;
+        newClick.clickIndex = static_cast<int>(clicks.size()) + 1;
+        clicks.push_back(newClick);
+
+        std::sort(clicks.begin(), clicks.end(), [](const ClickMarkerInfo& a, const ClickMarkerInfo& b) {
+            return a.frame < b.frame;
+        });
+        for (size_t i = 0; i < clicks.size(); i++) {
+            clicks[i].clickIndex = static_cast<int>(i + 1);
+            if (clicks[i].frame == currFrame) {
+                match = &clicks[i];
+            }
+        }
+        if (match && targetTier != ClickTier::None) {
+            ClickShowcase::get().m_manualClickTiers[match->clickIndex] = targetTier;
+        }
+    }
+
+    int cIdx = match ? match->clickIndex : static_cast<int>(clicks.size());
+    if (targetTier != ClickTier::None) {
+        std::string markerText = fmt::format("{} nº{} ({:.1f}%)", static_cast<char>(targetTier), cIdx, currPercent);
+        spawnMarkerInPlayLayer(playerPos, markerText, getTierColor(targetTier), cIdx);
+    } else {
+        removeMarkerInPlayLayer(cIdx);
+    }
+
+    triggerPlayLayerHUDUpdate();
+
+    int targetIdx = match ? (match->clickIndex - 1) : (static_cast<int>(clicks.size()) - 1);
+    m_currentPage = std::max(0, targetIdx / ITEMS_PER_PAGE);
+    refreshList(false);
+
+    if (targetTier != ClickTier::None) {
+        Notification::create(
+            fmt::format("Assigned {} at {:.2f}% (Frame {})", static_cast<char>(targetTier), currPercent, currFrame),
+            NotificationIcon::Success
+        )->show();
+    } else {
+        Notification::create("Cleared marker at current position", NotificationIcon::Info)->show();
+    }
 }
 
 void ShowcasePopup::onRowTogglePlayer(CCObject* sender) {
