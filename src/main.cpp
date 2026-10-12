@@ -97,10 +97,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         m_fields->m_countLabels.clear();
 
-        if (!ClickShowcase::get().m_showHUD || !isBotRunning()) return;
+        if (!ClickShowcase::get().m_showHUD) return;
 
         m_fields->m_hudNode = CCNode::create();
-        m_fields->m_hudNode->setPosition({ 5.f, CCDirector::get()->getWinSize().height - 5.f });
+        m_fields->m_hudNode->setPosition({ 8.f, 125.f });
         m_fields->m_hudNode->setID("frame-window-hud"_spr);
 
         if (this->m_uiLayer) this->m_uiLayer->addChild(m_fields->m_hudNode, 9999);
@@ -111,14 +111,14 @@ class $modify(MyPlayLayer, PlayLayer) {
             std::string name;
             ccColor4F color;
         };
-        // Presets: CLICKS (top), E, D, C, B, A (bottom) matching Frame Window Counter
+        // Presets: CLICKS (top), A, B, C, D, E (bottom-left)
         std::vector<HudItem> items = {
             { 0, "CLICKS", { 1.0f, 1.0f, 1.0f, 1.0f } },
-            { 5, "E",      { 0.0f, 0.75f, 1.00f, 1.0f } },
-            { 4, "D",      { 0.2f, 0.95f, 0.20f, 1.0f } },
-            { 3, "C",      { 1.0f, 0.85f, 0.00f, 1.0f } },
+            { 1, "A",      { 1.0f, 0.20f, 0.20f, 1.0f } },
             { 2, "B",      { 1.0f, 0.55f, 0.00f, 1.0f } },
-            { 1, "A",      { 1.0f, 0.20f, 0.20f, 1.0f } }
+            { 3, "C",      { 1.0f, 0.85f, 0.00f, 1.0f } },
+            { 4, "D",      { 0.2f, 0.95f, 0.20f, 1.0f } },
+            { 5, "E",      { 0.0f, 0.75f, 1.00f, 1.0f } }
         };
 
         float maxTextWidth = 25.f;
@@ -152,7 +152,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             createdLabels.push_back({ item.id, { textLabel, countLabel } });
         }
 
-        float currentY = -10.f;
+        float currentY = 0.f;
         for (auto& [id, pair] : createdLabels) {
             pair.first->setPosition({ 0.f, currentY });
             m_fields->m_hudNode->addChild(pair.first);
@@ -325,12 +325,13 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto gm = GameManager::sharedState();
         if (gm->getPlayLayer() && !gm->getPlayLayer()->m_isPaused) {
             if (this->m_player1 && !this->m_player1->m_isDead) {
-                bool botActive = isBotRunning();
                 if (m_fields->m_hudNode) {
-                    m_fields->m_hudNode->setVisible(botActive && ClickShowcase::get().m_showHUD);
-                } else if (botActive && ClickShowcase::get().m_showHUD) {
+                    m_fields->m_hudNode->setVisible(ClickShowcase::get().m_showHUD);
+                } else if (ClickShowcase::get().m_showHUD) {
                     this->rebuildHUD();
                 }
+
+                bool botActive = isBotRunning();
 
                 if (!botActive) {
                     for (auto& marker : m_fields->m_activeMarkers) {
