@@ -11,15 +11,17 @@
 #include <map>
 #include <cmath>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 using namespace geode::prelude;
 
 #include <config.hpp>
 
 inline bool isBotRunning() {
-    if (ClickShowcase::get().m_clicks.empty()) {
-        return false;
-    }
-
     if (!ClickShowcase::get().m_botOnly) {
         return true;
     }
@@ -29,7 +31,7 @@ inline bool isBotRunning() {
         return (state == 2); // 2 = Playback
     }
 
-    return true;
+    return !ClickShowcase::get().m_clicks.empty();
 }
 
 struct ActiveMarker {
@@ -61,16 +63,16 @@ class $modify(MyPlayLayer, PlayLayer) {
         int m_checkpointRemovalRestoreFrame = -1;
         std::map<int, int> m_hudCounts; // 0=CLICKS, 1=A, 2=B, 3=C, 4=D, 5=E
         Ref<CCNode> m_hudNode = nullptr;
-        Ref<CCLabelBMFont> m_liveActionLabel = nullptr;
-        Ref<CCLabelBMFont> m_liveStatsLabel = nullptr;
         std::vector<ActiveMarker> m_activeMarkers;
         std::map<int, Ref<CCLabelBMFont>> m_countLabels;
 
-        // In-game assign drawer
-        Ref<CCMenu> m_inGameAssignMenu = nullptr;
-        Ref<CCNode> m_inGameDrawer = nullptr;
-        Ref<CCLabelBMFont> m_drawerClickLabel = nullptr;
-        int m_selectedClickIndex = 1;
+        // Hotkey edge-detection states for keys 1-5, 0
+        bool m_key1Prev = false;
+        bool m_key2Prev = false;
+        bool m_key3Prev = false;
+        bool m_key4Prev = false;
+        bool m_key5Prev = false;
+        bool m_key0Prev = false;
     };
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
@@ -89,12 +91,16 @@ class $modify(MyPlayLayer, PlayLayer) {
         m_fields->m_hudCounts.clear();
         m_fields->m_activeMarkers.clear();
         m_fields->m_countLabels.clear();
-        m_fields->m_selectedClickIndex = 1;
+        m_fields->m_key1Prev = false;
+        m_fields->m_key2Prev = false;
+        m_fields->m_key3Prev = false;
+        m_fields->m_key4Prev = false;
+        m_fields->m_key5Prev = false;
+        m_fields->m_key0Prev = false;
 
         ClickShowcase::get().reset();
 
         this->rebuildHUD();
-        this->setupInGameAssignMenu();
         this->syncAllAssignedMarkers();
         this->schedule(schedule_selector(MyPlayLayer::onMyTick));
 
@@ -107,35 +113,15 @@ class $modify(MyPlayLayer, PlayLayer) {
             m_fields->m_hudNode = nullptr;
         }
         m_fields->m_countLabels.clear();
-        m_fields->m_liveActionLabel = nullptr;
-        m_fields->m_liveStatsLabel = nullptr;
 
         if (!ClickShowcase::get().m_showHUD) return;
 
         m_fields->m_hudNode = CCNode::create();
-        m_fields->m_hudNode->setPosition({ 8.f, 155.f });
+        m_fields->m_hudNode->setPosition({ 8.f, 125.f });
         m_fields->m_hudNode->setID("frame-window-hud"_spr);
 
         if (this->m_uiLayer) this->m_uiLayer->addChild(m_fields->m_hudNode, 9999);
         else this->addChild(m_fields->m_hudNode, 9999);
-
-        // 1. Live Click Action Label (#X Press/Rel [Tier] (XX.X%))
-        auto actionLbl = CCLabelBMFont::create("ACTION: NONE (0.0%)", "bigFont.fnt");
-        actionLbl->setAnchorPoint({ 0.f, 1.f });
-        actionLbl->setScale(0.38f);
-        actionLbl->setPosition({ 0.f, 0.f });
-        actionLbl->setColor({ 255, 255, 255 });
-        m_fields->m_hudNode->addChild(actionLbl);
-        m_fields->m_liveActionLabel = actionLbl;
-
-        // 2. Live Stats Label (CLICKS: X | RELS: Y)
-        auto statsLbl = CCLabelBMFont::create("CLICKS: 0 | RELS: 0", "bigFont.fnt");
-        statsLbl->setAnchorPoint({ 0.f, 1.f });
-        statsLbl->setScale(0.36f);
-        statsLbl->setPosition({ 0.f, -14.f });
-        statsLbl->setColor({ 200, 220, 255 });
-        m_fields->m_hudNode->addChild(statsLbl);
-        m_fields->m_liveStatsLabel = statsLbl;
 
         struct HudItem {
             int id;
@@ -183,7 +169,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             createdLabels.push_back({ item.id, { textLabel, countLabel } });
         }
 
-        float currentY = -30.f;
+        float currentY = 0.f;
         for (auto& [id, pair] : createdLabels) {
             pair.first->setPosition({ 0.f, currentY });
             m_fields->m_hudNode->addChild(pair.first);
@@ -193,251 +179,6 @@ class $modify(MyPlayLayer, PlayLayer) {
 
             m_fields->m_countLabels[id] = pair.second;
             currentY -= 16.f;
-        }
-    }
-
-    void updateLiveActionHUD(const ClickMarkerInfo& click) {
-        if (m_fields->m_liveActionLabel) {
-            std::string tierName = (click.tier == ClickTier::None) ? "-" : std::string(1, static_cast<char>(click.tier));
-            std::string actionType = click.isHold ? "Press" : "Rel";
-            std::string text = fmt::format("#{} {} [{}] ({:.1f}%)", click.clickIndex, actionType, tierName, click.percent);
-            m_fields->m_liveActionLabel->setString(text.c_str());
-            if (click.tier != ClickTier::None) {
-                ccColor4F col = getTierColor(click.tier);
-                m_fields->m_liveActionLabel->setColor({
-                    static_cast<GLubyte>(col.r * 255),
-                    static_cast<GLubyte>(col.g * 255),
-                    static_cast<GLubyte>(col.b * 255)
-                });
-            } else {
-                m_fields->m_liveActionLabel->setColor({ 255, 255, 255 });
-            }
-        }
-        if (m_fields->m_liveStatsLabel) {
-            int presses = ClickShowcase::get().m_livePressCount;
-            int rels = ClickShowcase::get().m_liveRelCount;
-            std::string statsText = fmt::format("CLICKS: {} | RELS: {}", presses, rels);
-            m_fields->m_liveStatsLabel->setString(statsText.c_str());
-        }
-        if (m_fields->m_inGameDrawer && m_fields->m_inGameDrawer->isVisible()) {
-            this->updateDrawerContent();
-        }
-    }
-
-    void setupInGameAssignMenu() {
-        if (!this->m_uiLayer) return;
-
-        if (m_fields->m_inGameAssignMenu) {
-            m_fields->m_inGameAssignMenu->removeFromParent();
-            m_fields->m_inGameAssignMenu = nullptr;
-        }
-
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
-        auto menu = CCMenu::create();
-        menu->setPosition({ 0.f, 0.f });
-        menu->setID("in-game-assign-menu"_spr);
-
-        auto btnSpr = ButtonSprite::create("ASSIGN", "bigFont.fnt", "GJ_button_04.png", 0.45f);
-        auto assignBtn = CCMenuItemSpriteExtra::create(
-            btnSpr, this, menu_selector(MyPlayLayer::onToggleAssignDrawer)
-        );
-        assignBtn->setPosition({ 42.f, winSize.height - 20.f });
-        assignBtn->setID("assign-btn"_spr);
-        menu->addChild(assignBtn);
-
-        this->m_uiLayer->addChild(menu, 9999);
-        m_fields->m_inGameAssignMenu = menu;
-    }
-
-    void onToggleAssignDrawer(CCObject*) {
-        if (!m_fields->m_inGameDrawer) {
-            this->createAssignDrawer();
-        } else {
-            bool visible = m_fields->m_inGameDrawer->isVisible();
-            m_fields->m_inGameDrawer->setVisible(!visible);
-            if (!visible) {
-                this->updateDrawerContent();
-            }
-        }
-    }
-
-    void createAssignDrawer() {
-        if (!this->m_uiLayer) return;
-        auto winSize = CCDirector::sharedDirector()->getWinSize();
-
-        auto drawer = CCNode::create();
-        drawer->setPosition({ winSize.width / 2.f, winSize.height - 35.f });
-        drawer->setID("in-game-drawer"_spr);
-
-        // Dark rounded background panel
-        auto bg = CCScale9Sprite::create("square02_001.png");
-        bg->setContentSize({ 380.f, 44.f });
-        bg->setColor({ 15, 15, 25 });
-        bg->setOpacity(220);
-        drawer->addChild(bg);
-
-        auto menu = CCMenu::create();
-        menu->setPosition({ 0.f, 0.f });
-        drawer->addChild(menu);
-
-        // [<] Prev click
-        auto prevSpr = ButtonSprite::create("<", "bigFont.fnt", "GJ_button_01.png", 0.38f);
-        auto prevBtn = CCMenuItemSpriteExtra::create(prevSpr, this, menu_selector(MyPlayLayer::onDrawerStepClick));
-        prevBtn->setTag(-1);
-        prevBtn->setPosition({ -165.f, 0.f });
-        menu->addChild(prevBtn);
-
-        // Click info label
-        auto lbl = CCLabelBMFont::create("No clicks", "bigFont.fnt");
-        lbl->setScale(0.36f);
-        lbl->setPosition({ -85.f, 0.f });
-        drawer->addChild(lbl);
-        m_fields->m_drawerClickLabel = lbl;
-
-        // [>] Next click
-        auto nextSpr = ButtonSprite::create(">", "bigFont.fnt", "GJ_button_01.png", 0.38f);
-        auto nextBtn = CCMenuItemSpriteExtra::create(nextSpr, this, menu_selector(MyPlayLayer::onDrawerStepClick));
-        nextBtn->setTag(1);
-        nextBtn->setPosition({ -5.f, 0.f });
-        menu->addChild(nextBtn);
-
-        // [NOW] Jump to latest triggered click
-        auto nowSpr = ButtonSprite::create("NOW", "goldFont.fnt", "GJ_button_01.png", 0.36f);
-        auto nowBtn = CCMenuItemSpriteExtra::create(nowSpr, this, menu_selector(MyPlayLayer::onDrawerJumpNow));
-        nowBtn->setPosition({ 32.f, 0.f });
-        menu->addChild(nowBtn);
-
-        // Tier buttons: A, B, C, D, E, None
-        struct TierBtnDef {
-            const char* label;
-            int tag;
-            float x;
-            ccColor3B col;
-        };
-        TierBtnDef tBtns[] = {
-            { "A", 1,  68.f, { 255, 51, 51 } },
-            { "B", 2,  94.f, { 255, 140, 0 } },
-            { "C", 3, 120.f, { 255, 217, 0 } },
-            { "D", 4, 146.f, { 51, 242, 51 } },
-            { "E", 5, 172.f, { 0, 191, 255 } },
-            { "-", 0, 196.f, { 180, 180, 180 } }
-        };
-
-        for (const auto& tb : tBtns) {
-            auto bSpr = ButtonSprite::create(tb.label, "bigFont.fnt", "GJ_button_01.png", 0.38f);
-            bSpr->setColor(tb.col);
-            auto bBtn = CCMenuItemSpriteExtra::create(bSpr, this, menu_selector(MyPlayLayer::onDrawerSelectTier));
-            bBtn->setTag(tb.tag);
-            bBtn->setPosition({ tb.x, 0.f });
-            menu->addChild(bBtn);
-        }
-
-        // [X] Close button
-        auto closeSpr = CCSprite::createWithSpriteFrameName("GJ_closeBtn_001.png");
-        closeSpr->setScale(0.55f);
-        auto closeBtn = CCMenuItemSpriteExtra::create(closeSpr, this, menu_selector(MyPlayLayer::onToggleAssignDrawer));
-        closeBtn->setPosition({ 182.f, 16.f });
-        menu->addChild(closeBtn);
-
-        this->m_uiLayer->addChild(drawer, 10000);
-        m_fields->m_inGameDrawer = drawer;
-        this->updateDrawerContent();
-    }
-
-    void updateDrawerContent() {
-        if (!m_fields->m_drawerClickLabel) return;
-        auto& clicks = ClickShowcase::get().m_clicks;
-        if (clicks.empty()) {
-            m_fields->m_drawerClickLabel->setString("No replay loaded");
-            return;
-        }
-
-        int idx = m_fields->m_selectedClickIndex;
-        if (idx < 1) idx = 1;
-        if (idx > static_cast<int>(clicks.size())) idx = static_cast<int>(clicks.size());
-        m_fields->m_selectedClickIndex = idx;
-
-        const auto& c = clicks[idx - 1];
-        std::string tStr = (c.tier == ClickTier::None) ? "None" : std::string(1, static_cast<char>(c.tier));
-        std::string typeStr = c.isHold ? "Press" : "Rel";
-        std::string text = fmt::format("#{} {} ({:.1f}%) Tier: {}", c.clickIndex, typeStr, c.percent, tStr);
-        m_fields->m_drawerClickLabel->setString(text.c_str());
-
-        if (c.tier != ClickTier::None) {
-            ccColor4F col = getTierColor(c.tier);
-            m_fields->m_drawerClickLabel->setColor({
-                static_cast<GLubyte>(col.r * 255),
-                static_cast<GLubyte>(col.g * 255),
-                static_cast<GLubyte>(col.b * 255)
-            });
-        } else {
-            m_fields->m_drawerClickLabel->setColor({ 255, 255, 255 });
-        }
-    }
-
-    void onDrawerStepClick(CCObject* sender) {
-        int delta = sender->getTag();
-        m_fields->m_selectedClickIndex += delta;
-        auto& clicks = ClickShowcase::get().m_clicks;
-        if (m_fields->m_selectedClickIndex < 1) m_fields->m_selectedClickIndex = 1;
-        if (m_fields->m_selectedClickIndex > static_cast<int>(clicks.size())) {
-            m_fields->m_selectedClickIndex = static_cast<int>(clicks.size());
-        }
-        this->updateDrawerContent();
-    }
-
-    void onDrawerJumpNow(CCObject*) {
-        if (ClickShowcase::get().m_lastActionIndex > 0) {
-            m_fields->m_selectedClickIndex = ClickShowcase::get().m_lastActionIndex;
-        }
-        this->updateDrawerContent();
-    }
-
-    void onDrawerSelectTier(CCObject* sender) {
-        int tierId = sender->getTag();
-        ClickTier newTier = ClickTier::None;
-        switch (tierId) {
-            case 1: newTier = ClickTier::A; break;
-            case 2: newTier = ClickTier::B; break;
-            case 3: newTier = ClickTier::C; break;
-            case 4: newTier = ClickTier::D; break;
-            case 5: newTier = ClickTier::E; break;
-            default: newTier = ClickTier::None; break;
-        }
-
-        int targetIdx = m_fields->m_selectedClickIndex;
-        for (auto& c : ClickShowcase::get().m_clicks) {
-            if (c.clickIndex == targetIdx) {
-                c.tier = newTier;
-
-                if (c.position.x == 0.f && c.position.y == 0.f && this->m_player1) {
-                    c.position = this->m_player1->getPosition();
-                }
-
-                if (c.tier != ClickTier::None) {
-                    this->spawnFrameWindowMarker(c.position, getTierColor(c.tier), c.clickIndex, !c.isHold);
-
-                    std::string sfx = getTierSound(c.tier);
-                    if (!sfx.empty()) {
-                        auto resPath = geode::Mod::get()->getResourcesDir() / sfx;
-                        if (std::filesystem::exists(resPath)) {
-                            FMODAudioEngine::sharedEngine()->playEffect(resPath.string().c_str(), 1.0f, 0.0f, 1.0f);
-                        } else {
-                            FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
-                        }
-                    }
-                } else {
-                    this->removeMarkerByClickIndex(c.clickIndex);
-                }
-
-                break;
-            }
-        }
-
-        this->updateDrawerContent();
-        this->updateHUDCounts();
-        if (tierId > 0) {
-            this->playHUDCountAnimation(tierId);
         }
     }
 
@@ -479,8 +220,8 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         constexpr float TIME_UP = 0.06f;
         constexpr float TIME_DOWN = 0.20f;
-        constexpr float BASE_SCALE = 0.50f;
-        constexpr float PEAK_SCALE = 0.60f;
+        constexpr float BASE_SCALE = 0.45f;
+        constexpr float PEAK_SCALE = 0.58f;
 
         auto scaleUp = CCEaseSineOut::create(CCScaleTo::create(TIME_UP, PEAK_SCALE));
         auto scaleDown = CCEaseSineOut::create(CCScaleTo::create(TIME_DOWN, BASE_SCALE));
@@ -591,6 +332,112 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
     }
 
+    void handleHotkeyAssign(ClickTier targetTier) {
+        if (!this->m_player1 || this->m_player1->m_isDead || this->m_isPaused) return;
+
+        if (!isBotRunning()) {
+            Notification::create("Bot is not running", NotificationIcon::Warning)->show();
+            return;
+        }
+
+        CCPoint playerPos = this->m_player1->getPosition();
+        int currFrame = m_fields->m_currentFrame;
+        float currPercent = this->getCurrentPercent();
+
+        auto& clicks = ClickShowcase::get().m_clicks;
+        ClickMarkerInfo* targetClick = nullptr;
+
+        // Search window: look for the click closest to currentFrame within reaction time (60 frames)
+        int bestDiff = 999999;
+        for (auto& c : clicks) {
+            int diff = std::abs(c.frame - currFrame);
+            if (diff < bestDiff && diff <= 60) {
+                bestDiff = diff;
+                targetClick = &c;
+            }
+        }
+
+        // Fallback: check last action index if triggered within 90 frames
+        if (!targetClick && ClickShowcase::get().m_lastActionIndex > 0) {
+            for (auto& c : clicks) {
+                if (c.clickIndex == ClickShowcase::get().m_lastActionIndex) {
+                    if (std::abs(c.frame - currFrame) <= 90) {
+                        targetClick = &c;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (targetClick) {
+            targetClick->tier = targetTier;
+            targetClick->position = playerPos;
+            ClickShowcase::get().m_manualClickTiers[targetClick->clickIndex] = targetTier;
+
+            if (targetTier != ClickTier::None) {
+                this->spawnFrameWindowMarker(playerPos, getTierColor(targetTier), targetClick->clickIndex, !targetClick->isHold);
+            } else {
+                this->removeMarkerByClickIndex(targetClick->clickIndex);
+            }
+        } else {
+            // No existing replay click found nearby: create a new click marker at this exact position and frame!
+            ClickMarkerInfo newClick;
+            newClick.frame = currFrame;
+            newClick.percent = currPercent;
+            newClick.position = playerPos;
+            newClick.tier = targetTier;
+            newClick.isHold = true;
+            newClick.isPlayer2 = false;
+            newClick.clickIndex = static_cast<int>(clicks.size()) + 1;
+            clicks.push_back(newClick);
+
+            std::sort(clicks.begin(), clicks.end(), [](const ClickMarkerInfo& a, const ClickMarkerInfo& b) {
+                return a.frame < b.frame;
+            });
+
+            for (size_t i = 0; i < clicks.size(); i++) {
+                clicks[i].clickIndex = static_cast<int>(i + 1);
+                if (clicks[i].frame == currFrame) {
+                    targetClick = &clicks[i];
+                }
+            }
+
+            if (targetClick && targetTier != ClickTier::None) {
+                ClickShowcase::get().m_manualClickTiers[targetClick->clickIndex] = targetTier;
+                this->spawnFrameWindowMarker(playerPos, getTierColor(targetTier), targetClick->clickIndex, false);
+            }
+        }
+
+        if (targetTier != ClickTier::None) {
+            int tid = getTierId(targetTier);
+            m_fields->m_hudCounts[tid]++;
+            m_fields->m_hudCounts[0]++;
+            this->updateHUDCounts();
+            this->playHUDCountAnimation(tid);
+            this->playHUDCountAnimation(0);
+
+            std::string sfx = getTierSound(targetTier);
+            if (!sfx.empty()) {
+                auto resPath = geode::Mod::get()->getResourcesDir() / sfx;
+                if (std::filesystem::exists(resPath)) {
+                    FMODAudioEngine::sharedEngine()->playEffect(resPath.string().c_str(), 1.0f, 0.0f, 1.0f);
+                } else {
+                    FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
+                }
+            }
+
+            char tChar = static_cast<char>(targetTier);
+            int cIdx = targetClick ? targetClick->clickIndex : static_cast<int>(clicks.size());
+            Notification::create(
+                fmt::format("Click #{} assigned to Tier {}", cIdx, tChar),
+                NotificationIcon::Success
+            )->show();
+        } else {
+            this->updateHUDCounts();
+            Notification::create("Marker cleared", NotificationIcon::Info)->show();
+        }
+    }
+
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
         this->updateAndCleanMarkers();
@@ -604,10 +451,6 @@ class $modify(MyPlayLayer, PlayLayer) {
                     m_fields->m_hudNode->setVisible(ClickShowcase::get().m_showHUD);
                 } else if (ClickShowcase::get().m_showHUD) {
                     this->rebuildHUD();
-                }
-
-                if (m_fields->m_inGameAssignMenu) {
-                    m_fields->m_inGameAssignMenu->setVisible(!ClickShowcase::get().m_clicks.empty());
                 }
 
                 bool botActive = isBotRunning();
@@ -633,6 +476,44 @@ class $modify(MyPlayLayer, PlayLayer) {
                 }
 
                 this->updateAndCleanMarkers();
+
+                // ── Keyboard Hotkeys: 1->A, 2->B, 3->C, 4->D, 5->E, 0->None ──
+                #ifdef _WIN32
+                HWND fgWnd = GetForegroundWindow();
+                DWORD procId = 0;
+                GetWindowThreadProcessId(fgWnd, &procId);
+                if (procId == GetCurrentProcessId()) {
+                    bool hasModal = false;
+                    if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
+                        if (scene->getChildByType<FLAlertLayer>(0) || scene->getChildByType<ShowcasePopup>(0)) {
+                            hasModal = true;
+                        }
+                    }
+
+                    if (!hasModal && !this->m_isPaused) {
+                        bool k1 = (GetAsyncKeyState('1') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) != 0;
+                        bool k2 = (GetAsyncKeyState('2') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) != 0;
+                        bool k3 = (GetAsyncKeyState('3') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) != 0;
+                        bool k4 = (GetAsyncKeyState('4') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD4) & 0x8000) != 0;
+                        bool k5 = (GetAsyncKeyState('5') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD5) & 0x8000) != 0;
+                        bool k0 = (GetAsyncKeyState('0') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD0) & 0x8000) != 0 || (GetAsyncKeyState(VK_DELETE) & 0x8000) != 0;
+
+                        if (k1 && !m_fields->m_key1Prev) this->handleHotkeyAssign(ClickTier::A);
+                        if (k2 && !m_fields->m_key2Prev) this->handleHotkeyAssign(ClickTier::B);
+                        if (k3 && !m_fields->m_key3Prev) this->handleHotkeyAssign(ClickTier::C);
+                        if (k4 && !m_fields->m_key4Prev) this->handleHotkeyAssign(ClickTier::D);
+                        if (k5 && !m_fields->m_key5Prev) this->handleHotkeyAssign(ClickTier::E);
+                        if (k0 && !m_fields->m_key0Prev) this->handleHotkeyAssign(ClickTier::None);
+
+                        m_fields->m_key1Prev = k1;
+                        m_fields->m_key2Prev = k2;
+                        m_fields->m_key3Prev = k3;
+                        m_fields->m_key4Prev = k4;
+                        m_fields->m_key5Prev = k5;
+                        m_fields->m_key0Prev = k0;
+                    }
+                }
+                #endif
             }
         }
     }
@@ -726,8 +607,6 @@ class $modify(MyPlayLayer, PlayLayer) {
                             }
                         }
                     }
-
-                    this->updateLiveActionHUD(click);
                 }
             }
 
@@ -896,7 +775,6 @@ void triggerPlayLayerHUDUpdate() {
         auto myPl = static_cast<MyPlayLayer*>(pl);
         myPl->rebuildHUD();
         myPl->syncAllAssignedMarkers();
-        myPl->updateDrawerContent();
     }
 }
 

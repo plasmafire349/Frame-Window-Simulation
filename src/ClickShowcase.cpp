@@ -213,6 +213,8 @@ void ClickShowcase::exportClicksJson(const std::filesystem::path& path) {
         item["tier"] = tierStr;
         item["hold"] = click.isHold;
         item["p2"] = click.isPlayer2;
+        item["x"] = click.position.x;
+        item["y"] = click.position.y;
         arr.push_back(item);
     }
 
@@ -261,7 +263,12 @@ void ClickShowcase::loadClicksJson(const std::filesystem::path& path) {
         info.tier = !tierStr.empty() ? static_cast<ClickTier>(tierStr[0]) : ClickTier::None;
         info.isHold = item.contains("hold") ? item["hold"].as<bool>().unwrapOr(true) : true;
         info.isPlayer2 = item.contains("p2") ? item["p2"].as<bool>().unwrapOr(false) : false;
+        info.position.x = static_cast<float>(item["x"].as<double>().unwrapOr(0.0));
+        info.position.y = static_cast<float>(item["y"].as<double>().unwrapOr(0.0));
         m_clicks.push_back(info);
+        if (info.tier != ClickTier::None) {
+            m_manualClickTiers[info.clickIndex] = info.tier;
+        }
     }
 
     geode::Notification::create(fmt::format("Loaded {} clicks from JSON!", m_clicks.size()).c_str(), geode::NotificationIcon::Success)->show();
