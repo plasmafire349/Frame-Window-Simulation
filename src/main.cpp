@@ -521,9 +521,12 @@ class $modify(MyPlayLayer, PlayLayer) {
         ClickShowcase::get().m_isRecording = newState;
 
         if (newState) {
-            ClickShowcase::get().m_recordedClicks.clear();
+            ClickShowcase::get().m_isPreviewing = false;
             this->updateRecIndicator(true);
-            Notification::create("Recording Started (Ctrl+Shift+J to stop)", NotificationIcon::Info)->show();
+            Notification::create("Recording from start (Ctrl+Shift+J to stop)", NotificationIcon::Info)->show();
+            // Restart so the recording begins at frame 0 and matches preview playback.
+            this->resetLevel();
+            ClickShowcase::get().m_recordedClicks.clear();
         } else {
             this->updateRecIndicator(false);
 

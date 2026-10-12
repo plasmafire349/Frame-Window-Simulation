@@ -736,24 +736,18 @@ void ShowcasePopup::onOpenRecordingsFolder(CCObject*) {
 }
 
 void ShowcasePopup::onPreview(CCObject*) {
-    std::string levelName = "level";
-    if (auto pl = PlayLayer::get()) {
-        if (pl->m_level) {
-            levelName = pl->m_level->m_levelName;
+    file::FilePickOptions options;
+    options.defaultPath = ClickShowcase::get().getRecordingsDir();
+    options.filters.push_back({
+        "Replay / JSON Files (*.gdr2, *.gdr, *.json)",
+        { "*.gdr2", "*.gdr", "*.json" }
+    });
+
+    async::spawn(file::pick(file::PickMode::OpenFile, options), [this](Result<std::optional<std::filesystem::path>> res) {
+        if (res.isOk() && res.unwrap().has_value()) {
+            this->startPlaybackPreview(res.unwrap().value().string());
         }
-    }
-
-    auto filePath = ClickShowcase::get().getLatestRecordingFile(levelName);
-    if (filePath.empty() || !std::filesystem::exists(filePath)) {
-        FLAlertLayer::create(
-            "No Recording Found",
-            "No recording or showcase file found in <cg>fwc_recordings/</c>!\nPress <cy>Ctrl+Shift+J</c> to record a run first.",
-            "OK"
-        )->show();
-        return;
-    }
-
-    this->startPlaybackPreview(filePath.string());
+    });
 }
 
 void ShowcasePopup::startPlaybackPreview(const std::string& filename) {
