@@ -341,11 +341,6 @@ class $modify(MyPlayLayer, PlayLayer) {
     void handleHotkeyAssign(ClickTier targetTier) {
         if (!this->m_player1 || this->m_player1->m_isDead || this->m_isPaused) return;
 
-        if (!isBotRunning()) {
-            Notification::create("Bot is not running", NotificationIcon::Warning)->show();
-            return;
-        }
-
         CCPoint playerPos = this->m_player1->getPosition();
         int currFrame = m_fields->m_currentFrame;
         float currPercent = this->getCurrentPercent();
@@ -442,6 +437,11 @@ class $modify(MyPlayLayer, PlayLayer) {
             this->updateHUDCounts();
             Notification::create("Marker cleared", NotificationIcon::Info)->show();
         }
+
+        // Auto-save immediately to fwc_recordings/
+        std::string lvl = (this->m_level && !this->m_level->m_levelName.empty()) ? this->m_level->m_levelName : "level";
+        auto dir = ClickShowcase::get().getRecordingsDir();
+        ClickShowcase::get().exportClicksJson(dir / fmt::format("showcase_{}.json", lvl));
     }
 
     void onRecordPlayerInput(bool isHold, bool isPlayer2) {
@@ -559,15 +559,6 @@ class $modify(MyPlayLayer, PlayLayer) {
 
                 this->updateRecIndicator(ClickShowcase::get().m_isRecording);
 
-                bool botActive = isBotRunning();
-
-                if (!botActive) {
-                    for (auto& marker : m_fields->m_activeMarkers) {
-                        if (marker.node) marker.node->setVisible(false);
-                    }
-                    return;
-                }
-
                 for (auto& marker : m_fields->m_activeMarkers) {
                     if (marker.node) marker.node->setVisible(true);
                 }
@@ -589,14 +580,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                 DWORD procId = 0;
                 GetWindowThreadProcessId(fgWnd, &procId);
                 if (procId == GetCurrentProcessId()) {
-                    bool hasModal = false;
-                    if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
-                        if (scene->getChildByType<FLAlertLayer>(0) || scene->getChildByType<ShowcasePopup>(0)) {
-                            hasModal = true;
-                        }
-                    }
-
-                    if (!hasModal && !this->m_isPaused) {
+                    if (!this->m_isPaused) {
                         bool isCtrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
                         bool isShift = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0;
                         bool isJ = (GetAsyncKeyState('J') & 0x8000) != 0;
@@ -607,26 +591,28 @@ class $modify(MyPlayLayer, PlayLayer) {
                         }
                         m_fields->m_recComboPrev = recCombo;
 
-                        bool k1 = (GetAsyncKeyState('1') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) != 0;
-                        bool k2 = (GetAsyncKeyState('2') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) != 0;
-                        bool k3 = (GetAsyncKeyState('3') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) != 0;
-                        bool k4 = (GetAsyncKeyState('4') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD4) & 0x8000) != 0;
-                        bool k5 = (GetAsyncKeyState('5') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD5) & 0x8000) != 0;
-                        bool k0 = (GetAsyncKeyState('0') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD0) & 0x8000) != 0 || (GetAsyncKeyState(VK_DELETE) & 0x8000) != 0;
+                        if (!isCtrl && !isShift) {
+                            bool k1 = (GetAsyncKeyState('1') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD1) & 0x8000) != 0;
+                            bool k2 = (GetAsyncKeyState('2') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD2) & 0x8000) != 0;
+                            bool k3 = (GetAsyncKeyState('3') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD3) & 0x8000) != 0;
+                            bool k4 = (GetAsyncKeyState('4') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD4) & 0x8000) != 0;
+                            bool k5 = (GetAsyncKeyState('5') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD5) & 0x8000) != 0;
+                            bool k0 = (GetAsyncKeyState('0') & 0x8000) != 0 || (GetAsyncKeyState(VK_NUMPAD0) & 0x8000) != 0 || (GetAsyncKeyState(VK_DELETE) & 0x8000) != 0;
 
-                        if (k1 && !m_fields->m_key1Prev) this->handleHotkeyAssign(ClickTier::A);
-                        if (k2 && !m_fields->m_key2Prev) this->handleHotkeyAssign(ClickTier::B);
-                        if (k3 && !m_fields->m_key3Prev) this->handleHotkeyAssign(ClickTier::C);
-                        if (k4 && !m_fields->m_key4Prev) this->handleHotkeyAssign(ClickTier::D);
-                        if (k5 && !m_fields->m_key5Prev) this->handleHotkeyAssign(ClickTier::E);
-                        if (k0 && !m_fields->m_key0Prev) this->handleHotkeyAssign(ClickTier::None);
+                            if (k1 && !m_fields->m_key1Prev) this->handleHotkeyAssign(ClickTier::A);
+                            if (k2 && !m_fields->m_key2Prev) this->handleHotkeyAssign(ClickTier::B);
+                            if (k3 && !m_fields->m_key3Prev) this->handleHotkeyAssign(ClickTier::C);
+                            if (k4 && !m_fields->m_key4Prev) this->handleHotkeyAssign(ClickTier::D);
+                            if (k5 && !m_fields->m_key5Prev) this->handleHotkeyAssign(ClickTier::E);
+                            if (k0 && !m_fields->m_key0Prev) this->handleHotkeyAssign(ClickTier::None);
 
-                        m_fields->m_key1Prev = k1;
-                        m_fields->m_key2Prev = k2;
-                        m_fields->m_key3Prev = k3;
-                        m_fields->m_key4Prev = k4;
-                        m_fields->m_key5Prev = k5;
-                        m_fields->m_key0Prev = k0;
+                            m_fields->m_key1Prev = k1;
+                            m_fields->m_key2Prev = k2;
+                            m_fields->m_key3Prev = k3;
+                            m_fields->m_key4Prev = k4;
+                            m_fields->m_key5Prev = k5;
+                            m_fields->m_key0Prev = k0;
+                        }
                     }
                 }
                 #endif
