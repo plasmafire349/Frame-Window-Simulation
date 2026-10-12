@@ -641,21 +641,15 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
     }
 
-    void onPhysicsStep() {
+    void onPrePhysicsStep() {
         if (!this->m_player1 || this->m_player1->m_isDead) return;
         if (!isBotRunning()) return;
 
-        if (m_fields->m_restoreFrameArmed) {
-            applyRestoredFrame();
-        }
-
-        m_fields->m_currentFrame++;
-        int currentFrame = m_fields->m_currentFrame;
-
-        // If preview mode is active, simulate player inputs hands-free
+        // If preview mode is active, inject inputs BEFORE PlayerObject::update() calculates physics
         if (ClickShowcase::get().m_isPreviewing) {
+            int targetFrame = m_fields->m_currentFrame;
             for (const auto& click : ClickShowcase::get().m_clicks) {
-                if (click.frame == currentFrame) {
+                if (click.frame == targetFrame) {
                     auto player = (click.isPlayer2 && this->m_player2) ? this->m_player2 : this->m_player1;
                     if (player) {
                         if (click.isHold) {
@@ -667,6 +661,18 @@ class $modify(MyPlayLayer, PlayLayer) {
                 }
             }
         }
+    }
+
+    void onPhysicsStep() {
+        if (!this->m_player1 || this->m_player1->m_isDead) return;
+        if (!isBotRunning()) return;
+
+        if (m_fields->m_restoreFrameArmed) {
+            applyRestoredFrame();
+        }
+
+        m_fields->m_currentFrame++;
+        int currentFrame = m_fields->m_currentFrame;
 
         // Auto-capture exact positions and percents for clicks matching currentFrame
         for (auto& click : ClickShowcase::get().m_clicks) {
@@ -866,6 +872,11 @@ class $modify(MyPlayLayer, PlayLayer) {
 
     void onQuit() {
         ClickShowcase::get().m_isPreviewing = false;
+        if (ClickShowcase::get().m_isRecording) {
+            ClickShowcase::get().m_isRecording = false;
+            std::string lvl = (this->m_level && !this->m_level->m_levelName.empty()) ? this->m_level->m_levelName : "level";
+            ClickShowcase::get().saveCurrentRecording(lvl);
+        }
         this->unschedule(schedule_selector(MyPlayLayer::onMyTick));
         PlayLayer::onQuit();
     }
@@ -873,9 +884,13 @@ class $modify(MyPlayLayer, PlayLayer) {
 
 class $modify(MyPlayerObject, PlayerObject) {
     void update(float dt) {
+        auto pl = PlayLayer::get();
+        if (pl && !pl->m_isPaused && this == pl->m_player1) {
+            static_cast<MyPlayLayer*>(pl)->onPrePhysicsStep();
+        }
+
         PlayerObject::update(dt);
 
-        auto pl = PlayLayer::get();
         if (pl && !pl->m_isPaused && this == pl->m_player1) {
             static_cast<MyPlayLayer*>(pl)->onPhysicsStep();
         }
@@ -884,7 +899,7 @@ class $modify(MyPlayerObject, PlayerObject) {
     void pushButton(PlayerButton p0) {
         PlayerObject::pushButton(p0);
         auto pl = PlayLayer::get();
-        if (pl && !pl->m_isPaused && ClickShowcase::get().m_isRecording) {
+        if (pl && p0 == PlayerButton::Jump && !pl->m_isPaused && ClickShowcase::get().m_isRecording) {
             bool isP2 = (this == pl->m_player2);
             static_cast<MyPlayLayer*>(pl)->onRecordPlayerInput(true, isP2);
         }
@@ -893,7 +908,7 @@ class $modify(MyPlayerObject, PlayerObject) {
     void releaseButton(PlayerButton p0) {
         PlayerObject::releaseButton(p0);
         auto pl = PlayLayer::get();
-        if (pl && !pl->m_isPaused && ClickShowcase::get().m_isRecording) {
+        if (pl && p0 == PlayerButton::Jump && !pl->m_isPaused && ClickShowcase::get().m_isRecording) {
             bool isP2 = (this == pl->m_player2);
             static_cast<MyPlayLayer*>(pl)->onRecordPlayerInput(false, isP2);
         }

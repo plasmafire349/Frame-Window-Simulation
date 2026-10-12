@@ -112,6 +112,7 @@ int ClickShowcase::assignByPercentRange(float minPercent, float maxPercent, Clic
 
 void ClickShowcase::loadReplayFile(const std::filesystem::path& path, float levelLength) {
     m_clicks.clear();
+    m_manualClickTiers.clear();
     reset();
 
     ReplayFileResult res = parseReplay(path);
@@ -255,6 +256,7 @@ void ClickShowcase::loadClicksJson(const std::filesystem::path& path) {
     if (arr.empty()) return;
 
     m_clicks.clear();
+    m_manualClickTiers.clear();
     reset();
 
     for (const auto& item : arr) {
@@ -378,7 +380,10 @@ std::string ClickShowcase::saveCurrentRecording(const std::string& levelName) {
     auto fullPath = dir / filename;
 
     std::vector<matjson::Value> arr;
-    for (const auto& click : m_recordedClicks) {
+    for (auto& click : m_recordedClicks) {
+        if (m_manualClickTiers.contains(click.clickIndex)) {
+            click.tier = m_manualClickTiers[click.clickIndex];
+        }
         matjson::Value item;
         item["click"] = click.clickIndex;
         item["frame"] = click.frame;
@@ -407,6 +412,7 @@ std::string ClickShowcase::saveCurrentRecording(const std::string& levelName) {
 
     // Immediately make the recorded clicks active in the showcase
     m_clicks = m_recordedClicks;
+    applyAssignments();
     reset();
 
     return fullPath.string();

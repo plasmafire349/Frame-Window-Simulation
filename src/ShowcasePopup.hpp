@@ -37,6 +37,7 @@ protected:
     void onToggleMarkers(cocos2d::CCObject*);
     void onToggleAudio(cocos2d::CCObject*);
     void onToggleBotOnly(cocos2d::CCObject*);
+    void onToggleLetters(cocos2d::CCObject*);
     void onClose(cocos2d::CCObject*);
 
 public:

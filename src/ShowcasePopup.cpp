@@ -221,44 +221,30 @@ bool ShowcasePopup::init() {
     previewBtn->setPosition({ -45.f, -114.f });
     bottomMenu->addChild(previewBtn);
 
-    // Markers toggler
-    auto togglerMarkers = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleMarkers), 0.55f
-    );
-    togglerMarkers->toggle(ClickShowcase::get().m_showMarkers);
-    togglerMarkers->setPosition({ 15.f, -108.f });
-    bottomMenu->addChild(togglerMarkers);
+    // Checkboxes: Markers, Sounds, Bot Only, Letters (bottom-left HUD)
+    struct ToggleDef {
+        const char* label;
+        float x;
+        bool value;
+        SEL_MenuHandler handler;
+    };
+    ToggleDef toggles[] = {
+        { "Markers",  5.f,   ClickShowcase::get().m_showMarkers, menu_selector(ShowcasePopup::onToggleMarkers) },
+        { "Sounds",   60.f,  ClickShowcase::get().m_playAudio,   menu_selector(ShowcasePopup::onToggleAudio) },
+        { "Bot Only", 115.f, ClickShowcase::get().m_botOnly,     menu_selector(ShowcasePopup::onToggleBotOnly) },
+        { "Letters",  170.f, ClickShowcase::get().m_showHUD,     menu_selector(ShowcasePopup::onToggleLetters) },
+    };
+    for (const auto& t : toggles) {
+        auto toggler = CCMenuItemToggler::createWithStandardSprites(this, t.handler, 0.55f);
+        toggler->toggle(t.value);
+        toggler->setPosition({ t.x, -108.f });
+        bottomMenu->addChild(toggler);
 
-    auto lblMarkers = CCLabelBMFont::create("Markers", "goldFont.fnt");
-    lblMarkers->setScale(0.32f);
-    lblMarkers->setPosition({ winSize.width / 2.f + 15.f, winSize.height / 2.f - 126.f });
-    m_mainLayer->addChild(lblMarkers);
-
-    // Sounds toggler
-    auto togglerAudio = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleAudio), 0.55f
-    );
-    togglerAudio->toggle(ClickShowcase::get().m_playAudio);
-    togglerAudio->setPosition({ 75.f, -108.f });
-    bottomMenu->addChild(togglerAudio);
-
-    auto lblAudio = CCLabelBMFont::create("Sounds", "goldFont.fnt");
-    lblAudio->setScale(0.32f);
-    lblAudio->setPosition({ winSize.width / 2.f + 75.f, winSize.height / 2.f - 126.f });
-    m_mainLayer->addChild(lblAudio);
-
-    // Bot Only toggler
-    auto togglerBot = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(ShowcasePopup::onToggleBotOnly), 0.55f
-    );
-    togglerBot->toggle(ClickShowcase::get().m_botOnly);
-    togglerBot->setPosition({ 135.f, -108.f });
-    bottomMenu->addChild(togglerBot);
-
-    auto lblBot = CCLabelBMFont::create("Bot Only", "goldFont.fnt");
-    lblBot->setScale(0.32f);
-    lblBot->setPosition({ winSize.width / 2.f + 135.f, winSize.height / 2.f - 126.f });
-    m_mainLayer->addChild(lblBot);
+        auto lbl = CCLabelBMFont::create(t.label, "goldFont.fnt");
+        lbl->setScale(0.30f);
+        lbl->setPosition({ winSize.width / 2.f + t.x, winSize.height / 2.f - 126.f });
+        m_mainLayer->addChild(lbl);
+    }
 
     this->setKeypadEnabled(true);
     this->setTouchEnabled(true);
@@ -658,6 +644,11 @@ void ShowcasePopup::onToggleBotOnly(CCObject*) {
     triggerPlayLayerHUDUpdate();
 }
 
+void ShowcasePopup::onToggleLetters(CCObject*) {
+    ClickShowcase::get().m_showHUD = !ClickShowcase::get().m_showHUD;
+    triggerPlayLayerHUDUpdate();
+}
+
 void ShowcasePopup::onImport(CCObject*) {
     file::FilePickOptions options;
     options.defaultPath = ClickShowcase::get().getRecordingsDir();
@@ -666,7 +657,9 @@ void ShowcasePopup::onImport(CCObject*) {
         { "*.gdr2", "*.gdr", "*.json" }
     });
 
-    async::spawn(file::pick(file::PickMode::OpenFile, options), [this](Result<std::optional<std::filesystem::path>> res) {
+    auto self = Ref(this);
+    async::spawn(file::pick(file::PickMode::OpenFile, options), [self](Result<std::optional<std::filesystem::path>> res) {
+        if (!self) return;
         if (res.isOk() && res.unwrap().has_value()) {
             auto path = res.unwrap().value();
             std::string ext = path.extension().string();
@@ -686,8 +679,8 @@ void ShowcasePopup::onImport(CCObject*) {
             auto alert = FLAlertLayer::create("Success", fmt::format("Loaded {} clicks/inputs!", count).c_str(), "OK");
             alert->show();
 
-            m_currentPage = 0;
-            this->refreshList(true);
+            self->m_currentPage = 0;
+            self->refreshList(true);
             triggerPlayLayerHUDUpdate();
         }
     });
@@ -732,7 +725,7 @@ void ShowcasePopup::onOpenRecordingsFolder(CCObject*) {
 #else
     file::openFolder(dir);
 #endif
-    Notification::create("Opened fwc_recordings folder", NotificationIcon::Info)->show();
+    Notification::create(fmt::format("Path: {}", dir.string()), NotificationIcon::Info, 3.5f)->show();
 }
 
 void ShowcasePopup::onPreview(CCObject*) {
@@ -743,9 +736,11 @@ void ShowcasePopup::onPreview(CCObject*) {
         { "*.gdr2", "*.gdr", "*.json" }
     });
 
-    async::spawn(file::pick(file::PickMode::OpenFile, options), [this](Result<std::optional<std::filesystem::path>> res) {
+    auto self = Ref(this);
+    async::spawn(file::pick(file::PickMode::OpenFile, options), [self](Result<std::optional<std::filesystem::path>> res) {
+        if (!self) return;
         if (res.isOk() && res.unwrap().has_value()) {
-            this->startPlaybackPreview(res.unwrap().value().string());
+            self->startPlaybackPreview(res.unwrap().value().string());
         }
     });
 }
