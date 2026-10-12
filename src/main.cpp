@@ -13,35 +13,7 @@
 
 using namespace geode::prelude;
 
-namespace eclipse::__internal__ {
-    constexpr size_t API_VERSION = 1;
-
-    struct VTable {
-        bool(*Config_getBool)(std::string_view, bool const&) = nullptr;
-        int(*Config_getInt)(std::string_view, int const&) = nullptr;
-        double(*Config_getDouble)(std::string_view, double const&) = nullptr;
-        std::string(*Config_getString)(std::string_view, std::string const&) = nullptr;
-        std::string_view(*Config_getStringView)(std::string_view, std::string_view const&) = nullptr;
-        bool(*Config_getBoolInternal)(std::string_view, bool const&) = nullptr;
-        int(*Config_getIntInternal)(std::string_view, int const&) = nullptr;
-        double(*Config_getDoubleInternal)(std::string_view, double const&) = nullptr;
-        std::string(*Config_getStringInternal)(std::string_view, std::string const&) = nullptr;
-        std::string_view(*Config_getStringViewInternal)(std::string_view, std::string_view const&) = nullptr;
-    };
-
-    struct FetchVTableEvent : geode::Event<FetchVTableEvent, bool(VTable&, size_t)> {
-        using Event::Event;
-    };
-
-    inline VTable const& getVTable() {
-        static VTable vtable{};
-        static bool initialized = false;
-        if (!initialized) {
-            initialized = FetchVTableEvent().send(vtable, API_VERSION);
-        }
-        return vtable;
-    }
-}
+#include <config.hpp>
 
 inline bool isBotRunning() {
     if (ClickShowcase::get().m_clicks.empty()) {
@@ -52,9 +24,8 @@ inline bool isBotRunning() {
         return true;
     }
 
-    auto& vtable = eclipse::__internal__::getVTable();
-    if (vtable.Config_getInt) {
-        int state = vtable.Config_getInt("bot.state", 0);
+    if (Loader::get()->isModLoaded("eclipse.eclipse-menu")) {
+        int state = eclipse::config::get<int>("bot.state", 0);
         return (state == 2); // 2 = Playback
     }
 
