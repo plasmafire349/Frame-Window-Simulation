@@ -22,7 +22,7 @@ using namespace geode::prelude;
 #include <config.hpp>
 
 inline bool isBotRunning() {
-    if (ClickShowcase::get().m_isPreviewing) {
+    if (ClickShowcase::get().m_isPreviewing || ClickShowcase::get().m_isRecording) {
         return true;
     }
 
@@ -830,6 +830,11 @@ class $modify(MyPlayLayer, PlayLayer) {
 
     void resetLevel() {
         PlayLayer::resetLevel();
+
+        // A new attempt starts at frame 0, so drop clicks from the previous attempt.
+        if (ClickShowcase::get().m_isRecording) {
+            ClickShowcase::get().m_recordedClicks.clear();
+        }
 
         int restoreFrame = -1;
         if (this->m_isPracticeMode && !m_fields->m_checkpointFrameStack.empty()) {

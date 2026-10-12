@@ -227,7 +227,7 @@ void ClickShowcase::exportClicksJson(const std::filesystem::path& path) {
 
     std::ofstream f(path);
     if (f) {
-        f << root.dump(matjson::NO_INDENTATION);
+        f << root.dump(2);
         f.close();
         geode::Notification::create("Exported Clicks to JSON!", geode::NotificationIcon::Success)->show();
     }
@@ -401,7 +401,7 @@ std::string ClickShowcase::saveCurrentRecording(const std::string& levelName) {
 
     std::ofstream f(fullPath);
     if (f) {
-        f << root.dump(matjson::NO_INDENTATION);
+        f << root.dump(2);
         f.close();
     }
 
