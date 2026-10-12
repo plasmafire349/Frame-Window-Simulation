@@ -1,21 +1,30 @@
 #pragma once
 #include <Geode/Geode.hpp>
+#include <Geode/ui/ScrollLayer.hpp>
 
 class ShowcasePopup : public FLAlertLayer {
 protected:
     int m_currentPage = 0;
-    static constexpr int CLICKS_PER_PAGE = 6;
+    static constexpr int ITEMS_PER_PAGE = 20;
 
-    cocos2d::CCLayer* m_tableLayer = nullptr;
-    cocos2d::CCMenu* m_tableMenu = nullptr;
+    geode::ScrollLayer* m_scrollLayer = nullptr;
+    cocos2d::CCNode* m_contentNode = nullptr;
     cocos2d::CCLabelBMFont* m_pageLabel = nullptr;
+    CCMenuItemSpriteExtra* m_prevBtn = nullptr;
+    CCMenuItemSpriteExtra* m_nextBtn = nullptr;
     CCTextInputNode* m_rangeInput = nullptr;
 
     bool init() override;
 
+    cocos2d::CCNode* createCellTemplate(int index);
+    void refreshList();
+
     void onPrevPage(cocos2d::CCObject*);
     void onNextPage(cocos2d::CCObject*);
     void onRowTierClicked(cocos2d::CCObject* sender);
+    void onRowToggleDraw(cocos2d::CCObject* sender);
+    void onRowDelete(cocos2d::CCObject* sender);
+    void onRowTogglePlayer(cocos2d::CCObject* sender);
     void onQuickSetRange(cocos2d::CCObject* sender);
 
     void onImport(cocos2d::CCObject*);
@@ -23,8 +32,6 @@ protected:
     void onToggleMarkers(cocos2d::CCObject*);
     void onToggleAudio(cocos2d::CCObject*);
     void onClose(cocos2d::CCObject*);
-
-    void updateTable();
 
 public:
     static ShowcasePopup* create();
