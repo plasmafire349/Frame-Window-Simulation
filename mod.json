@@ -5,9 +5,9 @@
 		"mac": "2.2081",
 		"android": "2.2081"
 	},
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"id": "antigravity.fwc_simulator",
-	"name": "FWC Simulator",
+	"name": "Click Showcase",
 	"developer": "Antigravity",
-	"description": "Automated Frame Window Collision Simulator."
+	"description": "Visual click markers, A-E tier showcase, click counter, and audio."
 }

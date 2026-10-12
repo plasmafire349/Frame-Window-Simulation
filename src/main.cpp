@@ -2,31 +2,76 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
-#include <Geode/utils/file.hpp>
 #include <Geode/ui/BasedButtonSprite.hpp>
-#include "FWCSimulator.hpp"
+#include "ClickShowcase.hpp"
+#include "ShowcasePopup.hpp"
 
 using namespace geode::prelude;
 
 class $modify(MyPlayLayer, PlayLayer) {
+    struct Fields {
+        CCLabelBMFont* m_hudLabel = nullptr;
+    };
+
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) {
             return false;
         }
 
-        FWCSimulator::get().stopSimulation();
+        ClickShowcase::get().reset();
+
+        // Create clean HUD overlay in top-left
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+        auto hud = CCLabelBMFont::create("Clicks: 0", "bigFont.fnt");
+        hud->setAnchorPoint({ 0.0f, 1.0f });
+        hud->setPosition({ 10.0f, winSize.height - 10.0f });
+        hud->setScale(0.4f);
+        hud->setID("click-showcase-hud"_spr);
+
+        if (this->m_uiLayer) {
+            this->m_uiLayer->addChild(hud);
+        } else {
+            this->addChild(hud, 999);
+        }
+
+        m_fields->m_hudLabel = hud;
 
         return true;
     }
 
     void update(float dt) {
         PlayLayer::update(dt);
-        FWCSimulator::get().processTick(this);
+
+        ClickShowcase::get().onPhysicsStep(this);
+
+        // Update HUD display
+        if (m_fields->m_hudLabel && ClickShowcase::get().m_showHUD) {
+            size_t total = ClickShowcase::get().m_clicks.size();
+            int current = ClickShowcase::get().m_currentClicksHit;
+            auto& counts = ClickShowcase::get().m_tierCounts;
+
+            std::string text;
+            if (total > 0) {
+                text = fmt::format(
+                    "Clicks: {}/{}\nA:{}  B:{}  C:{}  D:{}  E:{}",
+                    current, total,
+                    counts[ClickTier::A], counts[ClickTier::B], counts[ClickTier::C],
+                    counts[ClickTier::D], counts[ClickTier::E]
+                );
+            } else {
+                text = "Clicks: (No replay loaded)";
+            }
+
+            m_fields->m_hudLabel->setString(text.c_str());
+            m_fields->m_hudLabel->setVisible(true);
+        } else if (m_fields->m_hudLabel) {
+            m_fields->m_hudLabel->setVisible(false);
+        }
     }
 
     void destroyPlayer(PlayerObject* p0, GameObject* p1) {
         PlayLayer::destroyPlayer(p0, p1);
-        FWCSimulator::get().onPlayerDeath();
+        ClickShowcase::get().onPlayerDeath();
     }
 };
 
@@ -37,38 +82,24 @@ class $modify(MyPauseLayer, PauseLayer) {
         auto menu = this->getChildByID("right-button-menu");
         if (!menu) return;
 
-        // Use a small circular button sprite to fit natively in right-button-menu
-        // (same size as the % and gear buttons already there)
-        auto icon = CCSprite::createWithSpriteFrameName("GJ_replayBtn_001.png");
+        // Clean small circular button matching pause menu styling
         auto spr = CircleButtonSprite::create(
-            icon,
+            CCSprite::createWithSpriteFrameName("GJ_replayBtn_001.png"),
             CircleBaseColor::Green,
             CircleBaseSize::Small
         );
-        auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(MyPauseLayer::onStartSim));
-        btn->setID("fwc-sim-button"_spr);
+        auto btn = CCMenuItemSpriteExtra::create(
+            spr, this, menu_selector(MyPauseLayer::onOpenShowcase)
+        );
+        btn->setID("click-showcase-btn"_spr);
         menu->addChild(btn);
         menu->updateLayout();
     }
 
-    void onStartSim(CCObject*) {
-        async::spawn(file::pick(file::PickMode::OpenFile, file::FilePickOptions {
-            .filters = { file::FilePickOptions::Filter {
-                .description = "Replay Files (*.gdr2, *.gdr, *.json)",
-                .files = { "*.gdr2", "*.gdr", "*.json" },
-            }}
-        }), [this](Result<std::optional<std::filesystem::path>> result) {
-            if (result.isOk() && result.unwrap().has_value()) {
-                auto path = result.unwrap().value();
-                ReplayData data = parseReplayFile(path);
-                if (data.actions.empty()) {
-                    FLAlertLayer::create("Error", "Failed to parse replay or no actions found.", "OK")->show();
-                    return;
-                }
-
-                FWCSimulator::get().startSimulation(data);
-                this->onResume(nullptr);
-            }
-        });
+    void onOpenShowcase(CCObject*) {
+        auto popup = ShowcasePopup::create();
+        if (popup) {
+            popup->show();
+        }
     }
 };
