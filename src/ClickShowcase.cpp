@@ -10,6 +10,9 @@ void ClickShowcase::reset() {
     m_currentFrame = 0;
     m_lastTriggeredFrame = -1;
     m_currentClicksHit = 0;
+    m_livePressCount = 0;
+    m_liveRelCount = 0;
+    m_lastActionIndex = 0;
     m_tierCounts.clear();
     for (auto& click : m_clicks) {
         click.hasTriggered = false;

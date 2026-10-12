@@ -30,6 +30,9 @@ public:
 
     // HUD tracking
     int m_currentClicksHit = 0;
+    int m_livePressCount = 0;
+    int m_liveRelCount = 0;
+    int m_lastActionIndex = 0;
     std::map<ClickTier, int> m_tierCounts;
 
     void loadReplayFile(const std::filesystem::path& path, float levelLength);
