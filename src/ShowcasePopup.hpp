@@ -33,3 +33,5 @@ protected:
 public:
     static ShowcasePopup* create();
 };
+
+void triggerPlayLayerHUDUpdate();

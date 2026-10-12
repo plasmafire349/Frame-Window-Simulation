@@ -195,62 +195,11 @@ cocos2d::CCNode* ClickShowcase::createMarker(const ClickMarkerInfo& info) {
 }
 
 void ClickShowcase::stepPhysicsFrame(PlayLayer* layer) {
-    if (!layer || m_clicks.empty()) return;
-    if (layer->m_isPaused) return;
-
-    auto player = layer->m_player1;
-    if (!player || player->m_isDead) return;
-
-    m_currentFrame++;
-
-    for (auto& click : m_clicks) {
-        if (!click.hasTriggered && m_currentFrame >= click.frame) {
-            click.hasTriggered = true;
-            m_currentClicksHit = click.clickIndex;
-            if (click.tier != ClickTier::None) {
-                m_tierCounts[click.tier]++;
-            }
-
-            // 1. Spawn floating marker if tier is not None
-            if (m_showMarkers && click.tier != ClickTier::None) {
-                CCPoint spawnPos = player->getPosition();
-                if (click.isPlayer2 && layer->m_player2) {
-                    spawnPos = layer->m_player2->getPosition();
-                }
-
-                auto marker = createMarker(click);
-                if (marker) {
-                    if (layer->m_objectLayer) {
-                        marker->setPosition(layer->m_objectLayer->convertToWorldSpace(spawnPos));
-                        marker->setScale(std::abs(layer->m_objectLayer->getScaleY()));
-                    } else {
-                        marker->setPosition(spawnPos);
-                    }
-
-                    if (layer->m_uiLayer) {
-                        layer->m_uiLayer->addChild(marker);
-                    } else {
-                        layer->addChild(marker, 9999);
-                    }
-                }
-            }
-
-            // 2. Play sound effect if tier is not None
-            if (m_playAudio && click.tier != ClickTier::None) {
-                std::string sfx = getTierSound(click.tier);
-                if (!sfx.empty()) {
-                    FMODAudioEngine::sharedEngine()->playEffect(sfx.c_str(), 1.0f, 0.0f, 1.0f);
-                }
-            }
-        }
-    }
+    // Handled in MyPlayLayer::onPhysicsStep
 }
 
 void ClickShowcase::onPhysicsStep(PlayLayer* layer) {
-    // Fallback if not hooked via PlayerObject
-    if (m_currentFrame == 0 && layer && layer->m_player1) {
-        stepPhysicsFrame(layer);
-    }
+    // Handled in MyPlayLayer::onPhysicsStep
 }
 
 void ClickShowcase::onPlayerDeath() {

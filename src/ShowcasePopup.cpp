@@ -381,6 +381,7 @@ void ShowcasePopup::onRowTierClicked(CCObject* sender) {
     int clickIndex = node->getTag();
     ClickShowcase::get().cycleClickTier(clickIndex);
     refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
+    triggerPlayLayerHUDUpdate();
 }
 
 void ShowcasePopup::onRowDelete(CCObject* sender) {
@@ -390,6 +391,7 @@ void ShowcasePopup::onRowDelete(CCObject* sender) {
     int clickIndex = node->getTag();
     ClickShowcase::get().assignByClick(clickIndex, ClickTier::None);
     refreshList(false); // DO NOT reset scroll, keeps user's scroll position!
+    triggerPlayLayerHUDUpdate();
 }
 
 void ShowcasePopup::onRowTogglePlayer(CCObject* sender) {
@@ -407,6 +409,7 @@ void ShowcasePopup::onRowTogglePlayer(CCObject* sender) {
 }
 
 void ShowcasePopup::onClose(CCObject*) {
+    triggerPlayLayerHUDUpdate();
     this->removeFromParentAndCleanup(true);
 }
 
@@ -447,6 +450,7 @@ void ShowcasePopup::onImport(CCObject*) {
 
             m_currentPage = 0;
             this->refreshList(true);
+            triggerPlayLayerHUDUpdate();
         }
     });
 }
