@@ -316,16 +316,22 @@ std::filesystem::path ClickShowcase::getRecordingsDir() {
     return path;
 }
 
-std::filesystem::path ClickShowcase::getLatestRecordingFile(const std::string& levelName) {
-    auto dir = getRecordingsDir();
-    if (!std::filesystem::exists(dir)) return {};
-
+// Makes a level name safe for use in a file name.
+static std::string sanitizeFileName(const std::string& levelName) {
     std::string safeName = levelName.empty() ? "level" : levelName;
     for (char& c : safeName) {
         if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
             c = '_';
         }
     }
+    return safeName;
+}
+
+std::filesystem::path ClickShowcase::getLatestRecordingFile(const std::string& levelName) {
+    auto dir = getRecordingsDir();
+    if (!std::filesystem::exists(dir)) return {};
+
+    std::string safeName = sanitizeFileName(levelName);
 
     // 1. Check for showcase_{levelName}.json
     auto showcaseFile = dir / fmt::format("showcase_{}.json", safeName);
@@ -366,12 +372,7 @@ std::string ClickShowcase::saveCurrentRecording(const std::string& levelName) {
     char timeBuf[64];
     std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d_%H-%M-%S", &tm);
 
-    std::string safeName = levelName.empty() ? "level" : levelName;
-    for (char& c : safeName) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-') {
-            c = '_';
-        }
-    }
+    std::string safeName = sanitizeFileName(levelName);
 
     std::string filename = fmt::format("{}_{}.json", safeName, timeBuf);
     auto fullPath = dir / filename;
