@@ -642,25 +642,8 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 
     void onPrePhysicsStep() {
-        if (!this->m_player1 || this->m_player1->m_isDead) return;
-        if (!isBotRunning()) return;
-
-        // If preview mode is active, inject inputs BEFORE PlayerObject::update() calculates physics
-        if (ClickShowcase::get().m_isPreviewing) {
-            int targetFrame = m_fields->m_currentFrame;
-            for (const auto& click : ClickShowcase::get().m_clicks) {
-                if (click.frame == targetFrame) {
-                    auto player = (click.isPlayer2 && this->m_player2) ? this->m_player2 : this->m_player1;
-                    if (player) {
-                        if (click.isHold) {
-                            player->pushButton(PlayerButton::Jump);
-                        } else {
-                            player->releaseButton(PlayerButton::Jump);
-                        }
-                    }
-                }
-            }
-        }
+        // Intentionally empty: preview never presses or releases buttons.
+        // Markers and sounds are triggered by recorded frame in onPhysicsStep().
     }
 
     void onPhysicsStep() {
