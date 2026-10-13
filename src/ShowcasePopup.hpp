@@ -34,6 +34,7 @@ protected:
     void startPlaybackPreview(const std::string& filename);
     void onToggleRecord(cocos2d::CCObject*);
     void onOpenRecordingsFolder(cocos2d::CCObject*);
+    void onClearPreview(cocos2d::CCObject*);
     void onToggleMarkers(cocos2d::CCObject*);
     void onToggleAudio(cocos2d::CCObject*);
     void onToggleBotOnly(cocos2d::CCObject*);
@@ -49,3 +50,4 @@ void triggerPlayLayerHUDUpdate();
 void togglePlayLayerRecording();
 void spawnMarkerInPlayLayer(cocos2d::CCPoint pos, cocos2d::ccColor4F color, int clickIndex = 0, bool isRelease = false);
 void removeMarkerInPlayLayer(int clickIndex);
+void clearMarkersInPlayLayer();

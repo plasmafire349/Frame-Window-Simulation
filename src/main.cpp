@@ -962,3 +962,15 @@ void removeMarkerInPlayLayer(int clickIndex) {
         static_cast<MyPlayLayer*>(pl)->removeMarkerByClickIndex(clickIndex);
     }
 }
+
+void clearMarkersInPlayLayer() {
+    if (auto pl = PlayLayer::get()) {
+        auto myPl = static_cast<MyPlayLayer*>(pl);
+        for (auto& marker : myPl->m_fields->m_activeMarkers) {
+            if (marker.node) marker.node->removeFromParent();
+        }
+        myPl->m_fields->m_activeMarkers.clear();
+        myPl->m_fields->m_hudCounts.clear();
+        myPl->updateHUDCounts();
+    }
+}

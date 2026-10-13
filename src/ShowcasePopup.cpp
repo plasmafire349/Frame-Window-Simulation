@@ -110,6 +110,14 @@ bool ShowcasePopup::init() {
     folderBtn->setPosition({ -115.f, 126.f });
     topMenu->addChild(folderBtn);
 
+    // Clear button (stops preview and empties the table)
+    auto clearSpr = ButtonSprite::create("Clear", "goldFont.fnt", "GJ_button_06.png", 0.50f);
+    auto clearBtn = CCMenuItemSpriteExtra::create(
+        clearSpr, this, menu_selector(ShowcasePopup::onClearPreview)
+    );
+    clearBtn->setPosition({ -58.f, 126.f });
+    topMenu->addChild(clearBtn);
+
     // Close button (top right)
     auto closeSpr = CCSprite::createWithSpriteFrameName("GJ_closeBtn_001.png");
     auto closeBtn = CCMenuItemSpriteExtra::create(
@@ -708,6 +716,20 @@ void ShowcasePopup::onToggleRecord(CCObject*) {
     }
 
     refreshList(true);
+}
+
+void ShowcasePopup::onClearPreview(CCObject*) {
+    auto& cs = ClickShowcase::get();
+    cs.m_isPreviewing = false;
+    cs.m_clicks.clear();
+    cs.m_manualClickTiers.clear();
+    cs.m_percentRules.clear();
+    cs.reset();
+
+    m_currentPage = 0;
+    refreshList(true);
+    clearMarkersInPlayLayer();
+    triggerPlayLayerHUDUpdate();
 }
 
 void ShowcasePopup::onOpenRecordingsFolder(CCObject*) {
