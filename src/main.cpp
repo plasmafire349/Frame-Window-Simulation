@@ -315,7 +315,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (!ClickShowcase::get().m_showMarkers) return;
 
         for (const auto& click : ClickShowcase::get().m_clicks) {
-            if (click.tier != ClickTier::None) {
+            if (click.tier != ClickTier::None && click.frame <= m_fields->m_currentFrame) {
                 if (click.position.x != 0.f || click.position.y != 0.f) {
                     bool alreadyExists = false;
                     for (auto& am : m_fields->m_activeMarkers) {
@@ -433,15 +433,8 @@ class $modify(MyPlayLayer, PlayLayer) {
                 }
             }
 
-            char tChar = static_cast<char>(targetTier);
-            int cIdx = targetClick ? targetClick->clickIndex : static_cast<int>(clicks.size());
-            Notification::create(
-                fmt::format("Click #{} assigned to Tier {}", cIdx, tChar),
-                NotificationIcon::Success
-            )->show();
         } else {
             this->updateHUDCounts();
-            Notification::create("Marker cleared", NotificationIcon::Info)->show();
         }
 
         // Auto-save immediately to fwc_recordings/
@@ -824,6 +817,12 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (ClickShowcase::get().m_isRecording) {
             ClickShowcase::get().m_recordedClicks.clear();
         }
+
+        // Markers re-appear as the player passes them again.
+        for (auto& marker : m_fields->m_activeMarkers) {
+            if (marker.node) marker.node->removeFromParent();
+        }
+        m_fields->m_activeMarkers.clear();
 
         int restoreFrame = -1;
         if (this->m_isPracticeMode && !m_fields->m_checkpointFrameStack.empty()) {

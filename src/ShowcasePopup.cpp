@@ -601,15 +601,6 @@ void ShowcasePopup::onQuickAssignCurrent(CCObject* sender) {
     int targetIdx = match ? (match->clickIndex - 1) : (static_cast<int>(clicks.size()) - 1);
     m_currentPage = std::max(0, targetIdx / ITEMS_PER_PAGE);
     refreshList(false);
-
-    if (targetTier != ClickTier::None) {
-        Notification::create(
-            fmt::format("Assigned {} at {:.2f}% (Frame {})", static_cast<char>(targetTier), currPercent, currFrame),
-            NotificationIcon::Success
-        )->show();
-    } else {
-        Notification::create("Cleared marker at current position", NotificationIcon::Info)->show();
-    }
 }
 
 void ShowcasePopup::onRowTogglePlayer(CCObject* sender) {
@@ -698,6 +689,7 @@ void ShowcasePopup::onExport(CCObject*) {
         if (res.isOk() && res.unwrap().has_value()) {
             auto path = res.unwrap().value();
             ClickShowcase::get().exportClicksJson(path);
+            Notification::create("Exported", NotificationIcon::Success)->show();
         }
     });
 }

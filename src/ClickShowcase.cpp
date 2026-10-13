@@ -230,7 +230,6 @@ void ClickShowcase::exportClicksJson(const std::filesystem::path& path) {
     if (f) {
         f << root.dump(2);
         f.close();
-        geode::Notification::create("Exported Clicks to JSON!", geode::NotificationIcon::Success)->show();
     }
 }
 
@@ -275,8 +274,6 @@ void ClickShowcase::loadClicksJson(const std::filesystem::path& path) {
             m_manualClickTiers[info.clickIndex] = info.tier;
         }
     }
-
-    geode::Notification::create(fmt::format("Loaded {} clicks from JSON!", m_clicks.size()).c_str(), geode::NotificationIcon::Success)->show();
 }
 
 int ClickShowcase::getTotalActiveClicks() const {
